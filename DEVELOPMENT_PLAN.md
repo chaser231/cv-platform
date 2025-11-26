@@ -13,15 +13,15 @@
 ## 📊 Общий прогресс
 
 ```
-███████████░░░░░░░░░ 55% до публичного релиза
+████████████░░░░░░░░ 60% до публичного релиза
 ```
 
 | Категория | Готово | Всего | Прогресс |
 |-----------|--------|-------|----------|
-| Core Features | 8 | 12 | 67% |
+| Core Features | 9 | 12 | 75% |
 | AI Integration | 4 | 8 | 50% |
 | UI/UX | 6 | 10 | 60% |
-| Infrastructure | 2 | 6 | 33% |
+| Infrastructure | 3 | 6 | 50% |
 
 ---
 
@@ -32,16 +32,16 @@
 
 ### Чек-лист
 
-- [ ] **0.1 Рефакторинг App.jsx** (Приоритет: HIGH)
-  - [ ] Вынести `Sidebar` → `src/components/layouts/Sidebar.jsx`
-  - [ ] Вынести `EditorForm` → `src/components/features/profile/EditorForm.jsx`
-  - [ ] Вынести `ResumePreview` → `src/components/features/profile/ResumePreview.jsx`
-  - [ ] Вынести `SettingsView` → `src/components/features/settings/SettingsView.jsx`
-  - [ ] Вынести `JobTailoringView` → `src/components/features/jobs/JobTailoringView.jsx`
-  - [ ] Вынести `AIChatWidget` → `src/components/common/AIChatWidget.jsx`
-  - [ ] Вынести `AIGenerateButton` → `src/components/common/AIGenerateButton.jsx`
-  - [ ] Создать `src/components/index.js` для barrel exports
-  - [ ] Оставить в `App.jsx` только layout и routing
+- [x] **0.1 Рефакторинг App.jsx** ✅ (Выполнено 26.11.2025)
+  - [x] Вынести `Sidebar` → `src/components/layouts/Sidebar.jsx`
+  - [x] Вынести `EditorForm` → `src/components/features/profile/EditorForm.jsx`
+  - [x] Вынести `ResumePreview` → `src/components/features/profile/ResumePreview.jsx`
+  - [x] Вынести `SettingsView` → `src/components/features/settings/SettingsView.jsx`
+  - [x] Вынести `JobTailoringView` → `src/components/features/jobs/JobTailoringView.jsx`
+  - [x] Вынести `AIChatWidget` → `src/components/common/AIChatWidget.jsx`
+  - [x] Вынести `AIGenerateButton` → `src/components/common/AIGenerateButton.jsx`
+  - [x] Создать `src/components/index.js` для barrel exports
+  - [x] Оставить в `App.jsx` только layout и routing
 
 - [ ] **0.2 Подключить реальный AI в Chat Widget**
   - [ ] Заменить setTimeout на `aiService.chat()`
@@ -271,6 +271,7 @@ src/
 - Создан единый план развития
 - Добавлен план рефакторинга App.jsx
 - Архивированы устаревшие документы
+- ✅ **Рефакторинг App.jsx завершён**: вынесено 7 компонентов, App.jsx сократился с 1558 до ~250 строк
 
 ---
 
