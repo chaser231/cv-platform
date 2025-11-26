@@ -1,0 +1,51 @@
+{
+  "name": "cv-platform",
+  "version": "0.2.0",
+  "description": "AI-powered CV builder and job tailoring platform with multilingual support",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "lucide-react": "^0.454.0",
+    "zustand": "^4.5.0",
+    "i18next": "^23.15.0",
+    "react-i18next": "^14.1.0",
+    "@react-pdf/renderer": "^3.4.4",
+    "date-fns": "^3.0.0",
+    "clsx": "^2.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.14.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.14",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "vite": "^5.4.10"
+  },
+  "keywords": [
+    "cv",
+    "resume",
+    "builder",
+    "ai",
+    "job-application",
+    "ats",
+    "multilingual",
+    "i18n",
+    "tailoring"
+  ],
+  "author": "Gary Yakovlev",
+  "license": "MIT"
+}
+
