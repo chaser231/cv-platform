@@ -425,11 +425,19 @@ ${currentSkills.join(', ')}
 
   /**
    * Чат с AI ассистентом
+   * @param {string} message - Сообщение пользователя
+   * @param {Object} context - Контекст
+   * @param {Object} context.profile - Профиль пользователя
+   * @param {string} context.job - Описание вакансии
+   * @param {Array} context.history - История сообщений [{role: 'user'|'assistant', content: string}]
+   * @param {string} locale - Язык (ru/en)
    */
   chat: async (message, context = {}, locale = 'ru') => {
+    const { profile, job, history = [] } = context;
+    
     const result = await callAI(
       'chat',
-      prompts.chat.system(locale, context),
+      prompts.chat.system(locale, { profile, job, history }),
       message,
       { locale }
     );

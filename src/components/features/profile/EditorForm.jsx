@@ -15,11 +15,14 @@ import {
   CheckCircle2,
   Globe,
   Sparkles,
-  X
+  X,
+  Wand2,
+  Loader2
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AIVariantsSelector } from '../../common/AIVariantsSelector';
 import AIGenerateButton from '../../common/AIGenerateButton';
+import aiService from '../../../services/ai/aiService';
 
 const EditorForm = ({ 
   data, 
@@ -44,6 +47,52 @@ const EditorForm = ({
     experienceId: null,
     originalText: ''
   });
+
+  // State для AI-предложенных навыков
+  const [suggestedSkills, setSuggestedSkills] = useState([]);
+  const [isLoadingSkills, setIsLoadingSkills] = useState(false);
+  const [skillsError, setSkillsError] = useState(null);
+
+  // Запрос AI-предложений навыков
+  const handleSuggestSkills = async () => {
+    setIsLoadingSkills(true);
+    setSkillsError(null);
+    
+    try {
+      const suggestions = await aiService.suggestSkills(
+        data.experience || [],
+        data.skills || [],
+        i18n.language
+      );
+      
+      // Фильтруем навыки, которые уже есть у пользователя
+      const filtered = (Array.isArray(suggestions) ? suggestions : [])
+        .filter(s => !data.skills?.includes(s.skill));
+      
+      setSuggestedSkills(filtered);
+    } catch (error) {
+      console.error('Skill suggestion error:', error);
+      setSkillsError(i18n.language === 'ru' 
+        ? 'Не удалось получить предложения. Попробуйте ещё раз.'
+        : 'Failed to get suggestions. Please try again.'
+      );
+    } finally {
+      setIsLoadingSkills(false);
+    }
+  };
+
+  // Добавить предложенный навык
+  const handleAddSuggestedSkill = (skill) => {
+    if (!data.skills?.includes(skill)) {
+      onChange({ ...data, skills: [...(data.skills || []), skill] });
+      setSuggestedSkills(prev => prev.filter(s => s.skill !== skill));
+    }
+  };
+
+  // Отклонить предложенный навык
+  const handleDismissSuggestedSkill = (skill) => {
+    setSuggestedSkills(prev => prev.filter(s => s.skill !== skill));
+  };
 
   // Открыть модалку выбора вариантов
   const openVariantsModal = (expId, text) => {
@@ -506,7 +555,22 @@ const EditorForm = ({
         {/* Skills Section */}
         {activeSection === 'skills' && (
           <div className="space-y-6 animate-fadeIn">
-            <h3 className="text-lg font-bold text-slate-800">{t('profile.skills')}</h3>
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold text-slate-800">{t('profile.skills')}</h3>
+              {/* AI Suggest Button */}
+              <button
+                onClick={handleSuggestSkills}
+                disabled={isLoadingSkills || isProcessingAI}
+                className="flex items-center space-x-1.5 text-xs font-medium text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoadingSkills ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Wand2 size={14} />
+                )}
+                <span>{i18n.language === 'ru' ? 'AI предложения' : 'AI Suggest'}</span>
+              </button>
+            </div>
             
             {/* Input для добавления навыка */}
             <div className="flex gap-2">
@@ -515,7 +579,7 @@ const EditorForm = ({
                 placeholder={t('profile.skillPlaceholder')}
                 onKeyPress={(e) => {
                   if (e.key === 'Enter' && e.target.value.trim()) {
-                    onChange({ ...data, skills: [...data.skills, e.target.value.trim()] });
+                    onChange({ ...data, skills: [...(data.skills || []), e.target.value.trim()] });
                     e.target.value = '';
                   }
                 }}
@@ -525,7 +589,7 @@ const EditorForm = ({
                 onClick={(e) => {
                   const input = e.target.previousElementSibling;
                   if (input.value.trim()) {
-                    onChange({ ...data, skills: [...data.skills, input.value.trim()] });
+                    onChange({ ...data, skills: [...(data.skills || []), input.value.trim()] });
                     input.value = '';
                   }
                 }}
@@ -534,6 +598,70 @@ const EditorForm = ({
                 <Plus size={16} className="mr-1" /> {t('common.add')}
               </button>
             </div>
+
+            {/* AI Suggested Skills */}
+            {suggestedSkills.length > 0 && (
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <Sparkles size={16} className="text-purple-600" />
+                    <span className="text-sm font-semibold text-purple-800">
+                      {i18n.language === 'ru' ? 'Рекомендуемые навыки' : 'Recommended Skills'}
+                    </span>
+                  </div>
+                  <button 
+                    onClick={() => setSuggestedSkills([])}
+                    className="text-purple-400 hover:text-purple-600 text-xs"
+                  >
+                    {i18n.language === 'ru' ? 'Скрыть' : 'Hide'}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {suggestedSkills.map((suggestion, index) => (
+                    <div
+                      key={index}
+                      className="bg-white border border-purple-200 rounded-lg px-3 py-2 flex items-center gap-2 group hover:border-purple-400 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-slate-700">{suggestion.skill}</span>
+                        {suggestion.reason && (
+                          <p className="text-[10px] text-slate-500 mt-0.5">{suggestion.reason}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleAddSuggestedSkill(suggestion.skill)}
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50 p-1 rounded transition-colors"
+                          title={i18n.language === 'ru' ? 'Добавить' : 'Add'}
+                        >
+                          <Plus size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDismissSuggestedSkill(suggestion.skill)}
+                          className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
+                          title={i18n.language === 'ru' ? 'Отклонить' : 'Dismiss'}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Skills Error */}
+            {skillsError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 flex items-center justify-between">
+                <span>{skillsError}</span>
+                <button 
+                  onClick={() => setSkillsError(null)}
+                  className="text-red-400 hover:text-red-600"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
 
             {/* Список навыков */}
             {data.skills && data.skills.length > 0 ? (
@@ -565,16 +693,18 @@ const EditorForm = ({
             )}
 
             {/* Подсказка */}
-            <div className="bg-blue-50 p-4 rounded-lg text-xs text-blue-700 flex items-start space-x-2">
-              <Sparkles size={16} className="mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-semibold mb-1">{t('ai.suggestions')}</p>
-                <p>{i18n.language === 'ru' 
-                  ? 'Добавьте как технические навыки (React, Python), так и soft skills (Коммуникация, Лидерство)'
-                  : 'Add both technical skills (React, Python) and soft skills (Communication, Leadership)'
-                }</p>
+            {!suggestedSkills.length && (
+              <div className="bg-blue-50 p-4 rounded-lg text-xs text-blue-700 flex items-start space-x-2">
+                <Sparkles size={16} className="mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold mb-1">{t('ai.suggestions')}</p>
+                  <p>{i18n.language === 'ru' 
+                    ? 'Нажмите "AI предложения" для автоматических рекомендаций на основе вашего опыта'
+                    : 'Click "AI Suggest" for automatic recommendations based on your experience'
+                  }</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
