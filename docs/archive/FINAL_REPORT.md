@@ -780,3 +780,7 @@ npm run dev
 *Автор: Gary Yakovlev*  
 *Проект: CV Platform v0.1.0 MVP*
 
+
+
+
+

@@ -340,3 +340,7 @@ const t = (key) => translations[currentLang][key];
 <button>{t('buttons.save')}</button>
 ```
 
+
+
+
+

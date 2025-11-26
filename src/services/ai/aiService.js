@@ -279,11 +279,17 @@ export const aiService = {
   
   /**
    * Улучшить профессиональное summary
+   * @param {string} text - Исходный текст
+   * @param {string} locale - Язык (ru/en)
+   * @param {Object} options - Дополнительные опции
+   * @param {string} options.industry - Индустрия (it, finance, marketing)
+   * @param {string} options.level - Уровень (junior, middle, senior, lead)
    */
-  improveSummary: async (text, locale = 'ru') => {
+  improveSummary: async (text, locale = 'ru', options = {}) => {
+    const { industry = 'it', level = 'middle' } = options;
     const result = await callAI(
       'improve_summary',
-      prompts.resume.improveSummary(locale),
+      prompts.resume.improveSummary(locale, { industry, level }),
       text,
       { locale }
     );

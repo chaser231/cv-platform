@@ -25,6 +25,7 @@ import aiService from './src/services/ai/aiService';
 import { useAutosave } from './src/hooks/useAutosave';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import PDFDocument from './src/components/PDFDocument';
+import { AIVariantsSelector } from './src/components/common/AIVariantsSelector';
 
 // --- MOCK DATA & TYPES ---
 
@@ -295,10 +296,38 @@ const ResumePreview = ({ data }) => {
 
 // 4. Editor Form Component
 const EditorForm = ({ data, onChange, onAIAction, isProcessingAI, onAddExperience, onAddProject, onAddLanguage, onDeleteExperience, onDeleteProject, onDeleteLanguage }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [activeSection, setActiveSection] = useState('personal');
   const [emailError, setEmailError] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  
+  // State для модалки выбора вариантов
+  const [variantsModal, setVariantsModal] = useState({
+    isOpen: false,
+    experienceId: null,
+    originalText: ''
+  });
+
+  // Открыть модалку выбора вариантов
+  const openVariantsModal = (expId, text) => {
+    setVariantsModal({
+      isOpen: true,
+      experienceId: expId,
+      originalText: text
+    });
+  };
+
+  // Применить выбранный вариант
+  const handleVariantSelect = (selectedText) => {
+    if (variantsModal.experienceId) {
+      const newExp = data.experience.map(exp => 
+        exp.id === variantsModal.experienceId 
+          ? { ...exp, description: selectedText } 
+          : exp
+      );
+      onChange({ ...data, experience: newExp });
+    }
+  };
 
   // Валидация email
   const validateEmail = (email) => {
@@ -577,11 +606,23 @@ const EditorForm = ({ data, onChange, onAIAction, isProcessingAI, onAddExperienc
                 <div className="relative">
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-xs font-semibold text-slate-500 uppercase">{t('profile.experience')}</label>
+                    <div className="flex items-center space-x-2">
+                      {/* Кнопка "3 варианта" */}
+                      <button
+                        onClick={() => openVariantsModal(exp.id, exp.description)}
+                        disabled={isProcessingAI || !exp.description}
+                        className="flex items-center space-x-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Sparkles size={12} />
+                        <span>3 варианта</span>
+                      </button>
+                      {/* Кнопка "Улучшить" (один вариант) */}
                     <AIGenerateButton 
                       isGenerating={isProcessingAI}
                       onGenerate={() => onAIAction('experience', exp.id)}
                       label={t('ai.improveAchievements')}
                     />
+                    </div>
                   </div>
                   <textarea 
                     rows={4}
@@ -895,6 +936,16 @@ const EditorForm = ({ data, onChange, onAIAction, isProcessingAI, onAddExperienc
         )}
 
       </div>
+      
+      {/* Модалка выбора вариантов AI */}
+      <AIVariantsSelector
+        isOpen={variantsModal.isOpen}
+        onClose={() => setVariantsModal({ isOpen: false, experienceId: null, originalText: '' })}
+        originalText={variantsModal.originalText}
+        onSelect={handleVariantSelect}
+        type="bullet"
+        locale={i18n.language}
+      />
     </div>
   );
 };

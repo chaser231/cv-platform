@@ -1,100 +1,125 @@
 /**
  * AI Router
  * Умный роутинг между AI провайдерами с fallback
+ * v2.0 - Добавлена поддержка YandexGPT для русского языка
  */
 
 import { falProvider } from './providers/falProvider';
 import { replicateProvider } from './providers/replicateProvider';
+import { yandexProvider } from './providers/yandexProvider';
+import { detectLanguage, shouldUseYandexGPT } from './utils/languageDetector';
 
 /**
  * Конфигурация роутинга для разных типов задач
+ * 
+ * Доступные модели:
+ * Replicate:
+ * - claude-haiku: anthropic/claude-3.5-haiku (быстрый, дешёвый) - DEFAULT
+ * - claude-sonnet: anthropic/claude-3.5-sonnet (качественный)
+ * - claude-3.7: anthropic/claude-3.7-sonnet (новейший)
+ * - gpt-4o-mini: openai/gpt-4o-mini (OpenAI)
+ * 
+ * YandexGPT (для русского языка):
+ * - yandexgpt-lite: быстрая модель
+ * - yandexgpt: основная модель
+ * - yandexgpt-32k: для длинных текстов
  */
 const ROUTING_CONFIG = {
-  // Улучшение summary - средняя сложность
+  // Улучшение summary - Claude Haiku или YandexGPT для русского
   'improve_summary': {
-    primary: { provider: 'fal', model: 'claude-haiku' },
-    fallback: { provider: 'replicate', model: 'llama-8b' },
-    timeout: 15000,
+    primary: { provider: 'replicate', model: 'claude-haiku' },
+    russian: { provider: 'yandex', model: 'yandexgpt-lite' },
+    fallback: { provider: 'replicate', model: 'gpt-4o-mini' },
+    timeout: 120000,
     maxRetries: 2
   },
   
-  // Улучшение bullet point - простая задача
+  // Улучшение bullet point - Claude Haiku
   'improve_bullet': {
-    primary: { provider: 'fal', model: 'llama-8b' },
-    fallback: { provider: 'replicate', model: 'llama-8b' },
-    timeout: 10000,
+    primary: { provider: 'replicate', model: 'claude-haiku' },
+    russian: { provider: 'yandex', model: 'yandexgpt-lite' },
+    fallback: { provider: 'replicate', model: 'gpt-4o-mini' },
+    timeout: 120000,
     maxRetries: 2
   },
   
-  // Парсинг вакансии - простая задача
+  // Парсинг вакансии - Claude Haiku (хорош для JSON)
   'parse_job': {
-    primary: { provider: 'fal', model: 'llama-8b' },
-    fallback: { provider: 'replicate', model: 'llama-8b' },
-    timeout: 15000,
+    primary: { provider: 'replicate', model: 'claude-haiku' },
+    russian: { provider: 'yandex', model: 'yandexgpt' },
+    fallback: { provider: 'replicate', model: 'gpt-4o-mini' },
+    timeout: 120000,
     maxRetries: 2
   },
   
-  // Match Score - средняя сложность
+  // Match Score - Claude Haiku
   'match_score': {
-    primary: { provider: 'fal', model: 'llama-8b' },
-    fallback: { provider: 'replicate', model: 'llama-8b' },
-    timeout: 15000,
+    primary: { provider: 'replicate', model: 'claude-haiku' },
+    russian: { provider: 'yandex', model: 'yandexgpt' },
+    fallback: { provider: 'replicate', model: 'gpt-4o-mini' },
+    timeout: 120000,
     maxRetries: 2
   },
   
-  // Gap Analysis - сложная задача
+  // Gap Analysis - Claude Sonnet (нужно качество)
   'gap_analysis': {
-    primary: { provider: 'fal', model: 'claude-haiku' },
-    fallback: { provider: 'replicate', model: 'llama-70b' },
-    timeout: 20000,
+    primary: { provider: 'replicate', model: 'claude-sonnet' },
+    russian: { provider: 'yandex', model: 'yandexgpt' },
+    fallback: { provider: 'replicate', model: 'claude-haiku' },
+    timeout: 180000,
     maxRetries: 2
   },
   
-  // Resume Tailor - сложная задача
+  // Resume Tailor - Claude Sonnet
   'tailor_resume': {
-    primary: { provider: 'fal', model: 'claude-haiku' },
-    fallback: { provider: 'replicate', model: 'llama-70b' },
-    timeout: 25000,
+    primary: { provider: 'replicate', model: 'claude-sonnet' },
+    russian: { provider: 'yandex', model: 'yandexgpt' },
+    fallback: { provider: 'replicate', model: 'claude-haiku' },
+    timeout: 180000,
     maxRetries: 2
   },
   
-  // Cover Letter - требует качества
+  // Cover Letter - Claude 3.7 (лучшее качество)
   'cover_letter': {
-    primary: { provider: 'fal', model: 'claude-sonnet' },
-    fallback: { provider: 'fal', model: 'claude-haiku' },
-    timeout: 30000,
+    primary: { provider: 'replicate', model: 'claude-3.7' },
+    russian: { provider: 'yandex', model: 'yandexgpt' },
+    fallback: { provider: 'replicate', model: 'claude-sonnet' },
+    timeout: 180000,
     maxRetries: 2
   },
   
-  // Перевод - средняя сложность
+  // Перевод - Claude Haiku
   'translate': {
-    primary: { provider: 'fal', model: 'llama-8b' },
-    fallback: { provider: 'replicate', model: 'llama-8b' },
-    timeout: 15000,
+    primary: { provider: 'replicate', model: 'claude-haiku' },
+    fallback: { provider: 'replicate', model: 'gpt-4o-mini' },
+    timeout: 120000,
     maxRetries: 2
   },
   
-  // Чат - быстрый ответ
+  // Чат - Claude Haiku (быстрый ответ)
   'chat': {
-    primary: { provider: 'fal', model: 'llama-8b' },
-    fallback: { provider: 'replicate', model: 'llama-8b' },
-    timeout: 20000,
+    primary: { provider: 'replicate', model: 'claude-haiku' },
+    russian: { provider: 'yandex', model: 'yandexgpt-lite' },
+    fallback: { provider: 'replicate', model: 'gpt-4o-mini' },
+    timeout: 120000,
     maxRetries: 1
   },
   
-  // Предложение навыков - простая задача
+  // Предложение навыков - Claude Haiku
   'suggest_skills': {
-    primary: { provider: 'fal', model: 'llama-8b' },
-    fallback: { provider: 'replicate', model: 'llama-8b' },
-    timeout: 15000,
+    primary: { provider: 'replicate', model: 'claude-haiku' },
+    russian: { provider: 'yandex', model: 'yandexgpt-lite' },
+    fallback: { provider: 'replicate', model: 'gpt-4o-mini' },
+    timeout: 120000,
     maxRetries: 2
   },
   
-  // Default
+  // Default - Claude Haiku
   'default': {
-    primary: { provider: 'fal', model: 'llama-8b' },
-    fallback: { provider: 'replicate', model: 'llama-8b' },
-    timeout: 20000,
+    primary: { provider: 'replicate', model: 'claude-haiku' },
+    russian: { provider: 'yandex', model: 'yandexgpt-lite' },
+    fallback: { provider: 'replicate', model: 'gpt-4o-mini' },
+    timeout: 120000,
     maxRetries: 2
   }
 };
@@ -108,8 +133,10 @@ function getProvider(name) {
       return falProvider;
     case 'replicate':
       return replicateProvider;
+    case 'yandex':
+      return yandexProvider;
     default:
-      return falProvider;
+      return replicateProvider;
   }
 }
 
@@ -123,12 +150,50 @@ class AIRouter {
       successfulRequests: 0,
       failedRequests: 0,
       fallbackUsed: 0,
+      yandexUsed: 0,
       totalCost: 0,
       byProvider: {
         fal: { requests: 0, cost: 0 },
-        replicate: { requests: 0, cost: 0 }
+        replicate: { requests: 0, cost: 0 },
+        yandex: { requests: 0, cost: 0 }
       }
     };
+  }
+
+  /**
+   * Определить оптимальный провайдер для запроса
+   */
+  _selectProvider(config, userInput, options = {}) {
+    const { locale = 'en', forceProvider = null } = options;
+
+    // Принудительный выбор провайдера
+    if (forceProvider) {
+      return config.primary; // Use primary config with forced provider
+    }
+
+    // Проверяем, есть ли конфигурация для русского языка
+    if (config.russian && locale === 'ru') {
+      const russianProvider = getProvider(config.russian.provider);
+      
+      // Если YandexGPT доступен и текст на русском
+      if (russianProvider.isAvailable()) {
+        const detectedLang = detectLanguage(userInput);
+        
+        if (detectedLang === 'ru') {
+          this._log('Detected Russian text, using YandexGPT');
+          return config.russian;
+        }
+      }
+    }
+
+    // По умолчанию используем primary
+    return config.primary;
+  }
+
+  _log(...args) {
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.log('[AIRouter]', ...args);
+    }
   }
 
   /**
@@ -140,21 +205,25 @@ class AIRouter {
    */
   async route(taskType, systemPrompt, userInput, options = {}) {
     const config = ROUTING_CONFIG[taskType] || ROUTING_CONFIG['default'];
-    const { temperature = 0.7, maxTokens } = options;
+    const { temperature = 0.7, maxTokens, locale = 'en' } = options;
 
     this.stats.totalRequests++;
 
-    // Попытка через primary провайдер
-    const primaryProvider = getProvider(config.primary.provider);
-    
-    if (primaryProvider.isAvailable()) {
+    // Выбираем оптимальный провайдер
+    const selectedConfig = this._selectProvider(config, userInput, options);
+    const provider = getProvider(selectedConfig.provider);
+
+    this._log(`Task: ${taskType}, Provider: ${selectedConfig.provider}, Model: ${selectedConfig.model}`);
+
+    // Попытка через выбранный провайдер
+    if (provider.isAvailable()) {
       try {
         const result = await this._callWithRetry(
-          primaryProvider,
+          provider,
           systemPrompt,
           userInput,
           {
-            model: config.primary.model,
+            model: selectedConfig.model,
             temperature,
             maxTokens,
             timeout: config.timeout
@@ -162,18 +231,25 @@ class AIRouter {
           config.maxRetries
         );
 
-        this._updateStats(config.primary.provider, result);
+        this._updateStats(selectedConfig.provider, result);
+        
+        // Отмечаем использование YandexGPT
+        if (selectedConfig.provider === 'yandex') {
+          this.stats.yandexUsed++;
+        }
+        
         return result;
 
       } catch (primaryError) {
-        console.warn(`Primary provider (${config.primary.provider}) failed:`, primaryError.message);
+        console.warn(`Provider (${selectedConfig.provider}) failed:`, primaryError.message);
         
         // Fallback на backup провайдер
         return await this._tryFallback(config, systemPrompt, userInput, options);
       }
     }
 
-    // Если primary недоступен, сразу fallback
+    // Если выбранный провайдер недоступен, сразу fallback
+    this._log(`Provider ${selectedConfig.provider} not available, trying fallback`);
     return await this._tryFallback(config, systemPrompt, userInput, options);
   }
 
@@ -185,6 +261,34 @@ class AIRouter {
     const fallbackProvider = getProvider(config.fallback.provider);
 
     if (!fallbackProvider.isAvailable()) {
+      // Если fallback тоже недоступен, пробуем primary (если это не тот же провайдер)
+      const primaryProvider = getProvider(config.primary.provider);
+      
+      if (primaryProvider.isAvailable() && config.primary.provider !== config.fallback.provider) {
+        this.stats.fallbackUsed++;
+        
+        try {
+          const result = await this._callWithRetry(
+            primaryProvider,
+            systemPrompt,
+            userInput,
+            {
+              model: config.primary.model,
+              temperature,
+              maxTokens,
+              timeout: config.timeout
+            },
+            1
+          );
+          
+          this._updateStats(config.primary.provider, result);
+          return result;
+        } catch (error) {
+          this.stats.failedRequests++;
+          throw new Error(`All AI providers failed: ${error.message}`);
+        }
+      }
+      
       this.stats.failedRequests++;
       throw new Error('No AI providers available');
     }
@@ -262,14 +366,16 @@ class AIRouter {
    */
   async *routeStream(taskType, systemPrompt, userInput, options = {}) {
     const config = ROUTING_CONFIG[taskType] || ROUTING_CONFIG['default'];
-    const { temperature = 0.7, maxTokens } = options;
+    const { temperature = 0.7, maxTokens, locale = 'en' } = options;
 
-    const primaryProvider = getProvider(config.primary.provider);
+    // Выбираем провайдер
+    const selectedConfig = this._selectProvider(config, userInput, options);
+    const provider = getProvider(selectedConfig.provider);
 
-    if (primaryProvider.isAvailable()) {
+    if (provider.isAvailable() && provider.stream) {
       try {
-        yield* primaryProvider.stream(systemPrompt, userInput, {
-          model: config.primary.model,
+        yield* provider.stream(systemPrompt, userInput, {
+          model: selectedConfig.model,
           temperature,
           maxTokens
         });
@@ -279,12 +385,15 @@ class AIRouter {
       }
     }
 
+    // Fallback
     const fallbackProvider = getProvider(config.fallback.provider);
+    if (fallbackProvider.stream) {
     yield* fallbackProvider.stream(systemPrompt, userInput, {
       model: config.fallback.model,
       temperature,
       maxTokens
     });
+    }
   }
 
   /**
@@ -298,6 +407,9 @@ class AIRouter {
         : '0%',
       fallbackRate: this.stats.totalRequests > 0
         ? (this.stats.fallbackUsed / this.stats.totalRequests * 100).toFixed(2) + '%'
+        : '0%',
+      yandexRate: this.stats.totalRequests > 0
+        ? (this.stats.yandexUsed / this.stats.totalRequests * 100).toFixed(2) + '%'
         : '0%'
     };
   }
@@ -311,10 +423,12 @@ class AIRouter {
       successfulRequests: 0,
       failedRequests: 0,
       fallbackUsed: 0,
+      yandexUsed: 0,
       totalCost: 0,
       byProvider: {
         fal: { requests: 0, cost: 0 },
-        replicate: { requests: 0, cost: 0 }
+        replicate: { requests: 0, cost: 0 },
+        yandex: { requests: 0, cost: 0 }
       }
     };
   }
@@ -326,12 +440,39 @@ class AIRouter {
     return {
       fal: falProvider.isAvailable(),
       replicate: replicateProvider.isAvailable(),
-      anyAvailable: falProvider.isAvailable() || replicateProvider.isAvailable()
+      yandex: yandexProvider.isAvailable(),
+      anyAvailable: falProvider.isAvailable() || replicateProvider.isAvailable() || yandexProvider.isAvailable()
     };
+  }
+
+  /**
+   * Тест всех провайдеров
+   */
+  async testAllProviders() {
+    const results = {};
+    
+    if (replicateProvider.isAvailable()) {
+      results.replicate = await replicateProvider.testConnection();
+    } else {
+      results.replicate = { success: false, error: 'Not configured' };
+    }
+    
+    if (yandexProvider.isAvailable()) {
+      results.yandex = await yandexProvider.testConnection();
+    } else {
+      results.yandex = { success: false, error: 'Not configured' };
+    }
+    
+    if (falProvider.isAvailable()) {
+      results.fal = await falProvider.testConnection?.() || { success: false, error: 'Test not implemented' };
+    } else {
+      results.fal = { success: false, error: 'Not configured' };
+    }
+    
+    return results;
   }
 }
 
 // Экспорт singleton
 export const aiRouter = new AIRouter();
 export default aiRouter;
-

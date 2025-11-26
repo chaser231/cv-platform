@@ -1,27 +1,60 @@
 /**
  * Replicate Provider
- * Backup AI provider - большой выбор моделей
+ * PRIMARY AI provider для CV Platform
  * 
  * Документация: https://replicate.com/docs
+ * 
+ * Доступные модели (проверено):
+ * - anthropic/claude-3.5-haiku (быстрый, дешёвый)
+ * - anthropic/claude-3.5-sonnet (качественный)
+ * - anthropic/claude-3.7-sonnet (новейший)
+ * - openai/gpt-4o-mini (OpenAI через Replicate)
+ * - meta/llama-2-70b-chat (Llama 2)
  */
 
-const REPLICATE_API_URL = 'https://api.replicate.com/v1';
+// В development используем proxy через Vite
+const isDev = import.meta.env.DEV;
+const REPLICATE_API_URL = isDev 
+  ? '/api/replicate/v1'
+  : 'https://api.replicate.com/v1';
 
-// Маппинг моделей Replicate
+/**
+ * Доступные модели на Replicate
+ */
 const REPLICATE_MODELS = {
-  // Meta Llama модели
-  'llama-3b': 'meta/llama-3.2-3b-instruct',
-  'llama-8b': 'meta/llama-3.1-8b-instruct',
-  'llama-70b': 'meta/llama-3.1-70b-instruct',
-  'llama-405b': 'meta/llama-3.1-405b-instruct',
+  // Claude 3.5 Haiku - быстрый и дешёвый, отлично для простых задач
+  'claude-haiku': {
+    path: 'anthropic/claude-3.5-haiku',
+    maxTokens: 4096
+  },
   
-  // Mistral модели
-  'mistral-7b': 'mistralai/mistral-7b-instruct-v0.2',
-  'mixtral-8x7b': 'mistralai/mixtral-8x7b-instruct-v0.1',
+  // Claude 3.5 Sonnet - баланс качества и скорости
+  'claude-sonnet': {
+    path: 'anthropic/claude-3.5-sonnet',
+    maxTokens: 4096
+  },
   
-  // Default
-  'default': 'meta/llama-3.1-8b-instruct'
+  // Claude 3.7 Sonnet - новейший, лучшее качество
+  'claude-3.7': {
+    path: 'anthropic/claude-3.7-sonnet',
+    maxTokens: 8192
+  },
+  
+  // GPT-4o Mini через Replicate
+  'gpt-4o-mini': {
+    path: 'openai/gpt-4o-mini',
+    maxTokens: 4096
+  },
+  
+  // Llama 2 70B - open source альтернатива
+  'llama-70b': {
+    path: 'meta/llama-2-70b-chat',
+    maxTokens: 4096
+  }
 };
+
+// Default модель - Claude Haiku (быстрый и дешёвый)
+const DEFAULT_MODEL = 'claude-haiku';
 
 /**
  * Класс для работы с Replicate API
@@ -29,15 +62,19 @@ const REPLICATE_MODELS = {
 class ReplicateProvider {
   constructor() {
     this.apiKey = import.meta.env.VITE_REPLICATE_API_KEY;
-    this.enabled = import.meta.env.VITE_REPLICATE_ENABLED === 'true';
+    this.enabled = import.meta.env.VITE_REPLICATE_ENABLED !== 'false';
     this.baseUrl = REPLICATE_API_URL;
+    this.debug = import.meta.env.VITE_DEBUG === 'true';
   }
 
-  /**
-   * Проверка доступности провайдера
-   */
   isAvailable() {
     return this.enabled && !!this.apiKey;
+  }
+
+  _log(...args) {
+    if (this.debug) {
+      console.log('[Replicate]', ...args);
+    }
   }
 
   /**
@@ -45,82 +82,174 @@ class ReplicateProvider {
    */
   async complete(systemPrompt, userInput, options = {}) {
     const {
-      model = 'llama-8b',
+      model = DEFAULT_MODEL,
       temperature = 0.7,
       maxTokens = 1024,
-      timeout = 60000 // Replicate может быть медленнее
+      timeout = 120000
     } = options;
 
     if (!this.isAvailable()) {
       throw new Error('Replicate provider is not configured');
     }
 
-    const modelId = REPLICATE_MODELS[model] || REPLICATE_MODELS['default'];
+    const modelConfig = REPLICATE_MODELS[model] || REPLICATE_MODELS[DEFAULT_MODEL];
+    
+    this._log('Using model:', modelConfig.path);
 
     try {
-      // Шаг 1: Создать prediction
-      const prediction = await this._createPrediction(modelId, {
-        prompt: `${systemPrompt}\n\nUser: ${userInput}\n\nAssistant:`,
-        max_tokens: maxTokens,
-        temperature,
-        system_prompt: systemPrompt
+      // Формируем input - разный формат для разных моделей
+      const input = this._buildInput(modelConfig.path, systemPrompt, userInput, {
+        maxTokens: Math.min(maxTokens, modelConfig.maxTokens),
+        temperature
       });
 
-      // Шаг 2: Ждать результат
-      const result = await this._waitForPrediction(prediction.id, timeout);
+      this._log('Input:', JSON.stringify(input, null, 2));
 
-      // Шаг 3: Извлечь ответ
-      const output = Array.isArray(result.output) 
-        ? result.output.join('') 
-        : result.output;
+      // Запускаем модель
+      const prediction = await this._runModel(modelConfig.path, input, timeout);
+
+      this._log('Prediction completed:', prediction.id);
+
+      // Извлекаем output
+      const output = this._extractOutput(prediction.output);
 
       return {
-        content: output || '',
-        model: modelId,
+        content: output,
+        model: modelConfig.path,
         provider: 'replicate',
+        predictionId: prediction.id,
         usage: {
-          inputTokens: this._estimateTokens(systemPrompt + userInput),
-          outputTokens: this._estimateTokens(output || ''),
+          inputTokens: prediction.metrics?.input_token_count || this._estimateTokens(systemPrompt + userInput),
+          outputTokens: prediction.metrics?.output_token_count || this._estimateTokens(output),
           totalTokens: 0
-        },
-        metrics: result.metrics || {}
+        }
       };
 
     } catch (error) {
-      throw new Error(`Replicate error: ${error.message}`);
+      console.error('Replicate API error:', error);
+      throw error;
     }
   }
 
   /**
-   * Создание prediction
+   * Формирование input в зависимости от модели
    */
-  async _createPrediction(model, input) {
-    const response = await fetch(`${this.baseUrl}/predictions`, {
+  _buildInput(modelPath, systemPrompt, userInput, options) {
+    const { maxTokens, temperature } = options;
+
+    // Claude модели
+    if (modelPath.startsWith('anthropic/')) {
+      return {
+        prompt: userInput,
+        system_prompt: systemPrompt,
+        max_tokens: maxTokens,
+        temperature: temperature
+      };
+    }
+
+    // OpenAI модели
+    if (modelPath.startsWith('openai/')) {
+      return {
+        prompt: userInput,
+        system_prompt: systemPrompt,
+        max_tokens: maxTokens,
+        temperature: temperature
+      };
+    }
+
+    // Llama модели
+    if (modelPath.startsWith('meta/')) {
+      return {
+        prompt: `[INST] <<SYS>>\n${systemPrompt}\n<</SYS>>\n\n${userInput} [/INST]`,
+        max_new_tokens: maxTokens,
+        temperature: temperature,
+        top_p: 0.9
+      };
+    }
+
+    // Default format
+    return {
+      prompt: `${systemPrompt}\n\nUser: ${userInput}\n\nAssistant:`,
+      max_tokens: maxTokens,
+      temperature: temperature
+    };
+  }
+
+  /**
+   * Запуск модели через Official Model API
+   */
+  async _runModel(modelPath, input, timeout = 120000) {
+    // Сначала получаем версию модели
+    const modelInfoUrl = `${this.baseUrl}/models/${modelPath}`;
+    
+    this._log('Getting model info:', modelInfoUrl);
+
+    const modelResponse = await fetch(modelInfoUrl, {
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`
+      }
+    });
+
+    if (!modelResponse.ok) {
+      const error = await modelResponse.json().catch(() => ({}));
+      throw new Error(`Model not found: ${modelPath}. ${error.detail || ''}`);
+    }
+
+    const modelInfo = await modelResponse.json();
+    const version = modelInfo.latest_version?.id;
+
+    if (!version) {
+      throw new Error(`No version found for model: ${modelPath}`);
+    }
+
+    this._log('Using version:', version.substring(0, 20) + '...');
+
+    // Создаём prediction
+    const predictionUrl = `${this.baseUrl}/predictions`;
+    
+    const response = await fetch(predictionUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Prefer': 'wait=60' // Ждём до 60 секунд
       },
       body: JSON.stringify({
-        version: await this._getModelVersion(model),
-        input
+        version: version,
+        input: input
       })
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(`Failed to create prediction: ${error.detail || response.status}`);
+      this._log('API Error:', response.status, data);
+      throw new Error(`Replicate API error: ${data.detail || data.error || JSON.stringify(data)}`);
     }
 
-    return response.json();
+    this._log('Prediction status:', data.status);
+
+    // Если prediction ещё не завершён, ждём
+    if (data.status === 'starting' || data.status === 'processing') {
+      return await this._waitForPrediction(data.id, timeout);
+    }
+
+    if (data.status === 'failed') {
+      throw new Error(`Prediction failed: ${data.error}`);
+    }
+
+    return data;
   }
 
   /**
    * Ожидание завершения prediction
    */
-  async _waitForPrediction(predictionId, timeout) {
+  async _waitForPrediction(predictionId, timeout = 120000) {
     const startTime = Date.now();
+    const pollInterval = 1000;
     
+    this._log('Waiting for prediction:', predictionId);
+
     while (Date.now() - startTime < timeout) {
       const response = await fetch(`${this.baseUrl}/predictions/${predictionId}`, {
         headers: {
@@ -133,6 +262,7 @@ class ReplicateProvider {
       }
 
       const prediction = await response.json();
+      this._log('Status:', prediction.status);
 
       if (prediction.status === 'succeeded') {
         return prediction;
@@ -146,94 +276,36 @@ class ReplicateProvider {
         throw new Error('Prediction was canceled');
       }
 
-      // Ждём 1 секунду перед следующей проверкой
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
     }
 
-    throw new Error('Prediction timeout');
+    throw new Error(`Prediction timeout after ${timeout}ms`);
   }
 
   /**
-   * Получение версии модели
+   * Извлечение текста из output
    */
-  async _getModelVersion(model) {
-    // Для упрощения используем latest версию
-    // В production лучше кешировать версии
-    const response = await fetch(`${this.baseUrl}/models/${model}`, {
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to get model: ${response.status}`);
+  _extractOutput(output) {
+    if (!output) return '';
+    
+    // Массив токенов (Claude, некоторые модели)
+    if (Array.isArray(output)) {
+      return output.join('');
     }
-
-    const data = await response.json();
-    return data.latest_version?.id;
+    
+    // Строка
+    if (typeof output === 'string') {
+      return output;
+    }
+    
+    // Объект с полем text/response/content
+    if (typeof output === 'object') {
+      return output.text || output.response || output.content || output.generation || JSON.stringify(output);
+    }
+    
+    return String(output);
   }
 
-  /**
-   * Streaming completion
-   */
-  async *stream(systemPrompt, userInput, options = {}) {
-    const {
-      model = 'llama-8b',
-      temperature = 0.7,
-      maxTokens = 1024
-    } = options;
-
-    if (!this.isAvailable()) {
-      throw new Error('Replicate provider is not configured');
-    }
-
-    const modelId = REPLICATE_MODELS[model] || REPLICATE_MODELS['default'];
-
-    // Создаём prediction с stream
-    const prediction = await this._createPrediction(modelId, {
-      prompt: `${systemPrompt}\n\nUser: ${userInput}\n\nAssistant:`,
-      max_tokens: maxTokens,
-      temperature,
-      stream: true
-    });
-
-    // Читаем stream
-    if (prediction.urls?.stream) {
-      const response = await fetch(prediction.urls.stream, {
-        headers: {
-          'Accept': 'text/event-stream'
-        }
-      });
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          const chunk = decoder.decode(value, { stream: true });
-          // Parse SSE format
-          const lines = chunk.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data && data !== '[DONE]') {
-                yield data;
-              }
-            }
-          }
-        }
-      } finally {
-        reader.releaseLock();
-      }
-    }
-  }
-
-  /**
-   * Примерный подсчёт токенов
-   */
   _estimateTokens(text) {
     if (!text) return 0;
     return Math.ceil(text.length / 4);
@@ -241,29 +313,59 @@ class ReplicateProvider {
 
   /**
    * Расчёт стоимости
+   * Цены: https://replicate.com/pricing
    */
-  calculateCost(inputTokens, outputTokens, model = 'llama-8b') {
-    // Цены Replicate (per 1M tokens, конвертируем в per 1K)
+  calculateCost(inputTokens, outputTokens, model = DEFAULT_MODEL) {
+    // Примерные цены за 1M tokens
     const pricing = {
-      'llama-3b': { input: 0.00005, output: 0.00010 },
-      'llama-8b': { input: 0.00010, output: 0.00020 },
-      'llama-70b': { input: 0.00065, output: 0.00275 },
-      'llama-405b': { input: 0.00500, output: 0.01500 },
-      'mistral-7b': { input: 0.00010, output: 0.00020 },
-      'mixtral-8x7b': { input: 0.00030, output: 0.00100 }
+      'claude-haiku': { input: 0.25, output: 1.25 },
+      'claude-sonnet': { input: 3.00, output: 15.00 },
+      'claude-3.7': { input: 3.00, output: 15.00 },
+      'gpt-4o-mini': { input: 0.15, output: 0.60 },
+      'llama-70b': { input: 0.65, output: 2.75 }
     };
 
-    const price = pricing[model] || pricing['llama-8b'];
+    const price = pricing[model] || pricing[DEFAULT_MODEL];
     
     return {
-      inputCost: (inputTokens / 1000) * price.input,
-      outputCost: (outputTokens / 1000) * price.output,
-      totalCost: (inputTokens / 1000) * price.input + (outputTokens / 1000) * price.output
+      inputCost: (inputTokens / 1000000) * price.input,
+      outputCost: (outputTokens / 1000000) * price.output,
+      totalCost: (inputTokens / 1000000) * price.input + (outputTokens / 1000000) * price.output
     };
+  }
+
+  getAvailableModels() {
+    return Object.keys(REPLICATE_MODELS);
+  }
+
+  async testConnection() {
+    if (!this.isAvailable()) {
+      return { success: false, error: 'API key not configured' };
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/models/anthropic/claude-3.5-haiku`, {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return { 
+          success: true, 
+          model: `${data.owner}/${data.name}`,
+          version: data.latest_version?.id?.substring(0, 12)
+        };
+      } else {
+        const error = await response.json().catch(() => ({}));
+        return { success: false, error: error.detail || `HTTP ${response.status}` };
+      }
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
   }
 }
 
-// Экспорт singleton
 export const replicateProvider = new ReplicateProvider();
 export default replicateProvider;
-

@@ -1,83 +1,586 @@
 /**
  * AI Prompts Library
  * Централизованное хранилище всех промптов для AI
+ * 
+ * v3.0 - Роле-специфичные промпты с детальными примерами
  */
+
+import { SUMMARY_EXAMPLES_RU, ANTI_PATTERNS_RU, ACTION_VERBS_RU } from './examples/summary_ru';
+import { SUMMARY_EXAMPLES_EN, ANTI_PATTERNS_EN, ACTION_VERBS_EN } from './examples/summary_en';
+import { getSummaryPromptForIndustry, SUPPORTED_INDUSTRIES } from './templates';
+
+// Импорт системы ролей
+import { 
+  SENIORITY_LEVELS,
+  ROLE_CATEGORIES,
+  getRoleById,
+  getAllRoles
+} from './roles';
+import { ENGINEERING_ROLES, ENGINEERING_ACTION_VERBS } from './roles/engineering';
+import { PRODUCT_ROLES, PRODUCT_ACTION_VERBS } from './roles/product';
+import { DESIGN_ROLES, DESIGN_ACTION_VERBS } from './roles/design';
+import { DATA_ROLES, DATA_ACTION_VERBS } from './roles/data';
+import { MANAGEMENT_ROLES, MANAGEMENT_ACTION_VERBS } from './roles/management';
+import { QA_ROLES, QA_ACTION_VERBS } from './roles/qa';
+import { DEVOPS_ROLES, DEVOPS_ACTION_VERBS } from './roles/devops';
+import { OTHER_ROLES, OTHER_ACTION_VERBS } from './roles/other';
+
+/**
+ * Объединённая база ролей для быстрого доступа
+ */
+const ALL_ROLES = {
+  ...ENGINEERING_ROLES,
+  ...PRODUCT_ROLES,
+  ...DESIGN_ROLES,
+  ...DATA_ROLES,
+  ...MANAGEMENT_ROLES,
+  ...QA_ROLES,
+  ...DEVOPS_ROLES,
+  ...OTHER_ROLES
+};
+
+/**
+ * Объединённые action verbs по категориям ролей
+ */
+const ALL_ACTION_VERBS = {
+  engineering: ENGINEERING_ACTION_VERBS,
+  product: PRODUCT_ACTION_VERBS,
+  design: DESIGN_ACTION_VERBS,
+  data: DATA_ACTION_VERBS,
+  management: MANAGEMENT_ACTION_VERBS,
+  qa: QA_ACTION_VERBS,
+  devops: DEVOPS_ACTION_VERBS,
+  other: OTHER_ACTION_VERBS
+};
+
+/**
+ * Определение категории роли по ID
+ */
+function getRoleCategory(roleId) {
+  if (ENGINEERING_ROLES[roleId]) return 'engineering';
+  if (PRODUCT_ROLES[roleId]) return 'product';
+  if (DESIGN_ROLES[roleId]) return 'design';
+  if (DATA_ROLES[roleId]) return 'data';
+  if (MANAGEMENT_ROLES[roleId]) return 'management';
+  if (QA_ROLES[roleId]) return 'qa';
+  if (DEVOPS_ROLES[roleId]) return 'devops';
+  if (OTHER_ROLES[roleId]) return 'other';
+  return 'engineering'; // fallback
+}
+
+/**
+ * Получение контекста роли для промптов
+ * @param {string} roleId - ID роли (frontend, backend, product_manager, etc.)
+ * @param {string} level - Уровень (junior, middle, senior, staff, lead)
+ * @param {string} locale - Язык (ru/en)
+ * @returns {Object} Контекст роли
+ */
+function getRoleContext(roleId, level = 'middle', locale = 'ru') {
+  const role = ALL_ROLES[roleId];
+  if (!role) {
+    return null;
+  }
+
+  const category = getRoleCategory(roleId);
+  const actionVerbs = ALL_ACTION_VERBS[category]?.[locale] || ALL_ACTION_VERBS.engineering[locale];
+  const seniorityInfo = SENIORITY_LEVELS[level] || SENIORITY_LEVELS.middle;
+  const levelData = role.levels?.[level] || role.levels?.middle;
+
+  return {
+    role,
+    roleId,
+    category,
+    level,
+    title: role.title[locale] || role.title.en,
+    skills: role.skills,
+    atsKeywords: role.atsKeywords || [],
+    actionVerbs,
+    seniority: seniorityInfo,
+    levelData,
+    achievements: levelData?.achievements?.[locale] || levelData?.achievements?.en || [],
+    focus: levelData?.focus || [],
+    metrics: levelData?.metrics || []
+  };
+}
+
+/**
+ * Форматирование примеров достижений из роли для few-shot
+ */
+function formatRoleAchievements(roleContext, locale = 'ru', count = 3) {
+  if (!roleContext || !roleContext.achievements.length) {
+    return '';
+  }
+
+  const header = locale === 'ru' 
+    ? `\n--- ПРИМЕРЫ ДОСТИЖЕНИЙ ДЛЯ ${roleContext.title.toUpperCase()} (${roleContext.level.toUpperCase()}) ---\n`
+    : `\n--- ACHIEVEMENT EXAMPLES FOR ${roleContext.title.toUpperCase()} (${roleContext.level.toUpperCase()}) ---\n`;
+
+  const examples = roleContext.achievements.slice(0, count)
+    .map((ach, i) => `${i + 1}. ${ach}`)
+    .join('\n');
+
+  return header + examples + '\n';
+}
+
+/**
+ * Форматирование action verbs для роли
+ */
+function formatActionVerbs(roleContext, locale = 'ru') {
+  if (!roleContext?.actionVerbs) return '';
+
+  const verbs = roleContext.actionVerbs;
+  const categories = Object.keys(verbs);
+  
+  const header = locale === 'ru' ? '=== СИЛЬНЫЕ ГЛАГОЛЫ ===' : '=== STRONG ACTION VERBS ===';
+  
+  const formatted = categories
+    .map(cat => {
+      const label = {
+        creation: locale === 'ru' ? 'Создание' : 'Creation',
+        optimization: locale === 'ru' ? 'Оптимизация' : 'Optimization',
+        leadership: locale === 'ru' ? 'Лидерство' : 'Leadership',
+        problem_solving: locale === 'ru' ? 'Решение проблем' : 'Problem Solving',
+        strategy: locale === 'ru' ? 'Стратегия' : 'Strategy',
+        execution: locale === 'ru' ? 'Исполнение' : 'Execution',
+        growth: locale === 'ru' ? 'Рост' : 'Growth',
+        analysis: locale === 'ru' ? 'Анализ' : 'Analysis',
+        building: locale === 'ru' ? 'Построение' : 'Building',
+        delivery: locale === 'ru' ? 'Доставка' : 'Delivery',
+        design: locale === 'ru' ? 'Дизайн' : 'Design',
+        research: locale === 'ru' ? 'Исследование' : 'Research',
+        collaboration: locale === 'ru' ? 'Коллаборация' : 'Collaboration',
+        testing: locale === 'ru' ? 'Тестирование' : 'Testing',
+        quality: locale === 'ru' ? 'Качество' : 'Quality',
+        infrastructure: locale === 'ru' ? 'Инфраструктура' : 'Infrastructure',
+        automation: locale === 'ru' ? 'Автоматизация' : 'Automation',
+        reliability: locale === 'ru' ? 'Надёжность' : 'Reliability',
+        general: locale === 'ru' ? 'Общее' : 'General',
+        communication: locale === 'ru' ? 'Коммуникация' : 'Communication'
+      }[cat] || cat;
+      
+      return `${label}: ${verbs[cat].join(', ')}`;
+    })
+    .join('\n');
+
+  return `${header}\n${formatted}`;
+}
+
+/**
+ * Форматирование ATS ключевых слов
+ */
+function formatAtsKeywords(roleContext, locale = 'ru') {
+  if (!roleContext?.atsKeywords?.length) return '';
+
+  const header = locale === 'ru' 
+    ? '=== ATS КЛЮЧЕВЫЕ СЛОВА (используй где уместно) ===' 
+    : '=== ATS KEYWORDS (use where appropriate) ===';
+  
+  return `${header}\n${roleContext.atsKeywords.join(', ')}`;
+}
+
+/**
+ * Форматирование фокуса и метрик уровня
+ */
+function formatLevelFocus(roleContext, locale = 'ru') {
+  if (!roleContext?.levelData) return '';
+
+  const parts = [];
+  
+  if (roleContext.focus?.length) {
+    const focusHeader = locale === 'ru' ? 'Фокус на уровне:' : 'Level focus:';
+    parts.push(`${focusHeader} ${roleContext.focus.join(', ')}`);
+  }
+  
+  if (roleContext.metrics?.length) {
+    const metricsHeader = locale === 'ru' ? 'Ключевые метрики:' : 'Key metrics:';
+    parts.push(`${metricsHeader} ${roleContext.metrics.join(', ')}`);
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Форматирование few-shot примеров для промпта
+ */
+function formatFewShotExamples(locale = 'ru', industry = 'it', count = 2) {
+  const examples = locale === 'ru' ? SUMMARY_EXAMPLES_RU : SUMMARY_EXAMPLES_EN;
+  const industryExamples = examples[industry] || examples.it;
+  const badLabel = locale === 'ru' ? 'ПЛОХО' : 'BAD';
+  const goodLabel = locale === 'ru' ? 'ХОРОШО' : 'GOOD';
+  
+  let formatted = locale === 'ru' 
+    ? '\n--- ПРИМЕРЫ (учись на контрасте) ---\n' 
+    : '\n--- EXAMPLES (learn from contrast) ---\n';
+  
+  industryExamples.slice(0, count).forEach((ex, i) => {
+    formatted += `\n${i + 1}. ${ex.level.toUpperCase()}:\n`;
+    formatted += `${badLabel}: "${ex.bad}"\n`;
+    formatted += `${goodLabel}: "${ex.good}"\n`;
+  });
+  
+  return formatted;
+}
 
 /**
  * Промпты для улучшения резюме
  */
 export const RESUME_PROMPTS = {
   /**
-   * Улучшение Professional Summary
+   * Улучшение Professional Summary (v3 - с контекстом роли)
+   * @param {string} locale - Язык (ru/en)
+   * @param {Object} options - Опции
+   * @param {string} options.roleId - ID роли (frontend, backend, product_manager, etc.)
+   * @param {string} options.level - Уровень (junior, middle, senior, staff, lead)
+   * @param {string} options.industry - Индустрия (для fallback)
    */
-  improveSummary: (locale = 'ru') => `You are an expert resume writer with 10+ years of experience helping professionals land their dream jobs.
+  improveSummary: (locale = 'ru', options = {}) => {
+    const { roleId, industry = 'it', level = 'middle' } = options;
+    const antiPatterns = locale === 'ru' ? ANTI_PATTERNS_RU : ANTI_PATTERNS_EN;
+    
+    // Получаем контекст роли
+    const roleContext = roleId ? getRoleContext(roleId, level, locale) : null;
+    
+    // Формируем секции на основе роли
+    const roleTitle = roleContext?.title || (locale === 'ru' ? 'Специалист' : 'Professional');
+    const roleAchievements = roleContext ? formatRoleAchievements(roleContext, locale, 4) : '';
+    const actionVerbsSection = roleContext 
+      ? formatActionVerbs(roleContext, locale)
+      : formatActionVerbs({ actionVerbs: locale === 'ru' ? ACTION_VERBS_RU : ACTION_VERBS_EN }, locale);
+    const atsSection = roleContext ? formatAtsKeywords(roleContext, locale) : '';
+    const levelFocus = roleContext ? formatLevelFocus(roleContext, locale) : '';
+    
+    // Информация об уровне
+    const seniorityInfo = roleContext?.seniority || SENIORITY_LEVELS[level];
+    const yearsHint = seniorityInfo?.yearsExp || '2-5';
+    const levelCharacteristics = seniorityInfo?.characteristics?.[locale]?.join(', ') || '';
+    
+    return `You are an elite resume writer who has helped 5,000+ professionals land jobs at top companies (Google, Meta, Goldman Sachs, McKinsey).
 
-Your task: Rewrite the user's Professional Summary to make it compelling, achievement-focused, and ATS-friendly.
+YOUR TASK: Transform the user's Professional Summary for a ${roleTitle} position into a compelling, achievement-focused statement that makes recruiters want to call immediately.
 
-Guidelines:
-- Start with a strong professional identity (e.g., "Senior Full Stack Developer with 7+ years...")
-- Highlight 2-3 key achievements with metrics when possible
-- Include relevant technical skills naturally
-- Keep it under 150 words
-- Use active voice and strong action verbs
-- Make it scannable (recruiters spend 6-7 seconds on initial review)
+${locale === 'ru' ? `
+=== ПРОФИЛЬ КАНДИДАТА ===
+Роль: ${roleTitle}
+Уровень: ${level.toUpperCase()} (обычно ${yearsHint} лет опыта)
+${levelCharacteristics ? `Ожидаемые характеристики: ${levelCharacteristics}` : ''}
+${levelFocus}
+
+=== ОБЯЗАТЕЛЬНАЯ СТРУКТУРА ===
+1. [${roleTitle}] + [${yearsHint}+ лет опыта] + [специализация в области роли]
+2. [Главное достижение с КОНКРЕТНОЙ метрикой, релевантное для ${roleTitle}]
+3. [3-5 ключевых навыков/технологий${roleContext?.skills?.core ? ` из: ${roleContext.skills.core.slice(0, 6).join(', ')}` : ''}]
+4. [Лидерство или уникальная ценность для данного уровня]
+
+=== ПРАВИЛА МЕТРИК ===
+- ВСЕГДА используй конкретные цифры: %, $, время, количество
+- Метрики должны быть РЕАЛИСТИЧНЫМИ для уровня ${level} 
+${seniorityInfo?.metricsRange ? `- Типичный масштаб: команда ${seniorityInfo.metricsRange.teamSize}, scope: ${seniorityInfo.metricsRange.scope}` : ''}
+- Если метрик нет в исходном тексте - НЕ ВЫДУМЫВАЙ нереальные, лучше напиши "значительно улучшил" 
+- Примеры хороших метрик для ${roleTitle}: см. примеры достижений ниже
+
+=== КАТЕГОРИЧЕСКИ ИЗБЕГАТЬ ===
+${antiPatterns.slice(0, 5).map(p => `- "${p}"`).join('\n')}
+
+${actionVerbsSection}
+
+${atsSection}
+` : `
+=== CANDIDATE PROFILE ===
+Role: ${roleTitle}
+Level: ${level.toUpperCase()} (typically ${yearsHint} years of experience)
+${levelCharacteristics ? `Expected characteristics: ${levelCharacteristics}` : ''}
+${levelFocus}
+
+=== REQUIRED STRUCTURE ===
+1. [${roleTitle}] + [${yearsHint}+ years of experience] + [role-specific specialization]
+2. [Key achievement with SPECIFIC metric, relevant for ${roleTitle}]
+3. [3-5 key skills/technologies${roleContext?.skills?.core ? ` from: ${roleContext.skills.core.slice(0, 6).join(', ')}` : ''}]
+4. [Leadership or unique value proposition for this level]
+
+=== METRICS RULES ===
+- ALWAYS use specific numbers: %, $, time, quantity
+- Metrics must be REALISTIC for ${level} level
+${seniorityInfo?.metricsRange ? `- Typical scope: team of ${seniorityInfo.metricsRange.teamSize}, scope: ${seniorityInfo.metricsRange.scope}` : ''}
+- If no metrics in source - DON'T INVENT unrealistic ones, write "significantly improved" instead
+- Good metric examples for ${roleTitle}: see achievement examples below
+
+=== ABSOLUTELY AVOID ===
+${antiPatterns.slice(0, 5).map(p => `- "${p}"`).join('\n')}
+
+${actionVerbsSection}
+
+${atsSection}
+`}
+
+${roleAchievements || formatFewShotExamples(locale, industry, 2)}
+
+Output Language: ${locale === 'ru' ? 'Russian' : 'English'}
+Maximum Length: 120-150 words (4-5 sentences)
+Target Role: ${roleTitle}
+Candidate Level: ${level.toUpperCase()}
+
+CRITICAL: Return ONLY the improved summary. No explanations, no "Here's the improved version", just the text.`;
+  },
+
+  /**
+   * Улучшение Bullet Point (XYZ формула) - v3 с контекстом роли
+   * @param {string} locale - Язык (ru/en)
+   * @param {Object} options - Опции
+   * @param {string} options.roleId - ID роли
+   * @param {string} options.level - Уровень
+   */
+  improveBullet: (locale = 'ru', options = {}) => {
+    const { roleId, level = 'middle' } = options;
+    const roleContext = roleId ? getRoleContext(roleId, level, locale) : null;
+    
+    const roleTitle = roleContext?.title || '';
+    const roleAchievements = roleContext ? formatRoleAchievements(roleContext, locale, 3) : '';
+    const actionVerbsSection = roleContext 
+      ? formatActionVerbs(roleContext, locale)
+      : '';
+    const atsSection = roleContext ? formatAtsKeywords(roleContext, locale) : '';
+    const seniorityInfo = roleContext?.seniority || SENIORITY_LEVELS[level];
+    
+    return `You are an expert tech recruiter who has reviewed 10,000+ resumes at top companies.
+
+YOUR TASK: Transform the bullet point using the XYZ formula: "Accomplished [X] as measured by [Y], by doing [Z]"
+${roleTitle ? `\nTarget Role: ${roleTitle} (${level.toUpperCase()})` : ''}
+
+${locale === 'ru' ? `
+=== ФОРМУЛА XYZ ===
+[Сильный глагол] + [Что сделал] + [Измеримый результат] + [Как/чем]
+
+=== ПРИМЕРЫ ТРАНСФОРМАЦИИ ===
+${roleAchievements ? `
+--- ПРИМЕРЫ ДЛЯ ${roleTitle.toUpperCase()} ---
+${roleContext.achievements.slice(0, 3).map((ach, i) => `${i + 1}. ${ach}`).join('\n')}
+` : `
+БЫЛО: "Разрабатывал API для мобильного приложения"
+СТАЛО: "Спроектировал и реализовал REST API для мобильного приложения с 50K+ DAU, сократив время отклика на 60% за счёт оптимизации запросов к PostgreSQL"
+
+БЫЛО: "Работал над улучшением производительности"
+СТАЛО: "Оптимизировал критичные эндпоинты, сократив среднее время отклика с 800мс до 200мс (75%), что повысило конверсию checkout на 12%"
+`}
+
+=== ПРАВИЛА МЕТРИК ===
+- Если в оригинале ЕСТЬ число - ОБЯЗАТЕЛЬНО сохрани его
+- Если чисел НЕТ - предложи РЕАЛИСТИЧНЫЕ для уровня ${level}
+${seniorityInfo?.metricsRange ? `- Масштаб для ${level}: команда ${seniorityInfo.metricsRange.teamSize}, scope: ${seniorityInfo.metricsRange.scope}` : ''}
+- Лучше "сократил время" чем выдуманные "сократил на 90%"
+
+${actionVerbsSection || `=== СИЛЬНЫЕ ГЛАГОЛЫ ===
+Разработал, Спроектировал, Оптимизировал, Внедрил, Сократил, Увеличил, Автоматизировал, Руководил, Масштабировал`}
+
+${atsSection}
+` : `
+=== XYZ FORMULA ===
+[Strong verb] + [What you did] + [Measurable result] + [How/with what]
+
+=== TRANSFORMATION EXAMPLES ===
+${roleAchievements ? `
+--- EXAMPLES FOR ${roleTitle.toUpperCase()} ---
+${roleContext.achievements.slice(0, 3).map((ach, i) => `${i + 1}. ${ach}`).join('\n')}
+` : `
+BEFORE: "Developed API for mobile application"
+AFTER: "Designed and implemented REST API for mobile app with 50K+ DAU, reducing response time by 60% through PostgreSQL query optimization"
+
+BEFORE: "Worked on improving performance"
+AFTER: "Optimized critical endpoints, reducing average response time from 800ms to 200ms (75%), which increased checkout conversion by 12%"
+`}
+
+=== METRICS RULES ===
+- If original HAS a number - MUST preserve it
+- If NO numbers - suggest REALISTIC ones for ${level} level
+${seniorityInfo?.metricsRange ? `- Scope for ${level}: team of ${seniorityInfo.metricsRange.teamSize}, scope: ${seniorityInfo.metricsRange.scope}` : ''}
+- Better "reduced time" than made-up "reduced by 90%"
+
+${actionVerbsSection || `=== STRONG ACTION VERBS ===
+Developed, Designed, Optimized, Implemented, Reduced, Increased, Automated, Led, Scaled`}
+
+${atsSection}
+`}
+
+Output Language: ${locale === 'ru' ? 'Russian' : 'English'}
+Maximum Length: 1-2 lines (under 30 words ideally)
+
+CRITICAL: Return ONLY the improved bullet point. No explanations, no alternatives.`;
+  },
+
+  /**
+   * Генерация нескольких вариантов (v3 - с контекстом роли)
+   * @param {string} locale - Язык (ru/en)
+   * @param {number} count - Количество вариантов
+   * @param {Object} options - Опции
+   * @param {string} options.roleId - ID роли
+   * @param {string} options.level - Уровень
+   */
+  improveBulletVariants: (locale = 'ru', count = 3, options = {}) => {
+    const { roleId, level = 'middle' } = options;
+    const roleContext = roleId ? getRoleContext(roleId, level, locale) : null;
+    
+    const roleTitle = roleContext?.title || '';
+    const actionVerbsSection = roleContext 
+      ? formatActionVerbs(roleContext, locale)
+      : '';
+    const atsSection = roleContext ? formatAtsKeywords(roleContext, locale) : '';
+    const seniorityInfo = roleContext?.seniority || SENIORITY_LEVELS[level];
+    
+    // Получаем примеры достижений для роли
+    const roleExamples = roleContext?.achievements?.slice(0, 3) || [];
+    
+    return `You are an expert tech recruiter who has reviewed 10,000+ resumes.
+
+YOUR TASK: Generate ${count} DIFFERENT improved versions of the bullet point using XYZ formula.
+${roleTitle ? `\nTarget Role: ${roleTitle} (${level.toUpperCase()})` : ''}
+
+${locale === 'ru' ? `
+=== ТРЕБОВАНИЯ К ВАРИАНТАМ ===
+Каждый вариант должен:
+1. Использовать РАЗНЫЙ action verb (не повторяться!)
+2. Делать акцент на РАЗНОМ аспекте (технический / бизнес / лидерство)
+3. Иметь уникальную структуру
+4. Быть релевантным для роли ${roleTitle || 'специалиста'}
+
+=== СТИЛИ ВАРИАНТОВ ===
+Вариант 1: Технический фокус (архитектура, стек, оптимизация)
+Вариант 2: Бизнес-импакт (деньги, конверсия, пользователи, время)  
+Вариант 3: Командный/лидерский (менторство, процессы, collaboration)
+
+=== ПРАВИЛА МЕТРИК ===
+- Сохраняй числа из оригинала
+- Добавляй только РЕАЛИСТИЧНЫЕ метрики для уровня ${level}
+${seniorityInfo?.metricsRange ? `- Масштаб: команда ${seniorityInfo.metricsRange.teamSize}, scope: ${seniorityInfo.metricsRange.scope}` : ''}
+- Каждый вариант может иметь разные метрики
+
+${roleExamples.length > 0 ? `=== ПРИМЕРЫ ДОСТИЖЕНИЙ ДЛЯ ${roleTitle.toUpperCase()} ===
+${roleExamples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}
+` : `=== ПРИМЕР ===
+Исходный: "Разрабатывал бэкенд сервисы"
+
+1. Спроектировал и реализовал 5 микросервисов на Go, обрабатывающих 10K RPS с latency < 50ms
+2. Разработал backend-инфраструктуру, сократившую время обработки заказов на 40% и увеличившую throughput на 3x
+3. Создал архитектуру сервисов в команде из 4 разработчиков, внедрив стандарты документации API
+`}
+
+${actionVerbsSection}
+
+${atsSection}
+` : `
+=== VARIANT REQUIREMENTS ===
+Each variant must:
+1. Use DIFFERENT action verb (no repeats!)
+2. Emphasize DIFFERENT aspect (technical / business / leadership)
+3. Have unique structure
+4. Be relevant for ${roleTitle || 'professional'} role
+
+=== VARIANT STYLES ===
+Variant 1: Technical focus (architecture, stack, optimization)
+Variant 2: Business impact (revenue, conversion, users, time)
+Variant 3: Team/leadership (mentoring, processes, collaboration)
+
+=== METRICS RULES ===
+- Preserve numbers from original
+- Add only REALISTIC metrics for ${level} level
+${seniorityInfo?.metricsRange ? `- Scope: team of ${seniorityInfo.metricsRange.teamSize}, scope: ${seniorityInfo.metricsRange.scope}` : ''}
+- Each variant can have different metrics
+
+${roleExamples.length > 0 ? `=== ACHIEVEMENT EXAMPLES FOR ${roleTitle.toUpperCase()} ===
+${roleExamples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}
+` : `=== EXAMPLE ===
+Original: "Developed backend services"
+
+1. Designed and implemented 5 microservices in Go, handling 10K RPS with latency < 50ms
+2. Built backend infrastructure that reduced order processing time by 40% and increased throughput by 3x
+3. Architected service layer with team of 4 engineers, establishing API documentation standards
+`}
+
+${actionVerbsSection}
+
+${atsSection}
+`}
 
 Output Language: ${locale === 'ru' ? 'Russian' : 'English'}
 
-IMPORTANT: Return ONLY the improved summary text, no explanations or additional text.`,
+FORMAT: Return EXACTLY ${count} bullet points, numbered 1-${count}, one per line.
+CRITICAL: No explanations, no headers, just the numbered list.`;
+  },
 
   /**
-   * Улучшение Bullet Point (XYZ формула)
+   * Предложение навыков (v3 - с учётом роли)
+   * @param {string} locale - Язык (ru/en)
+   * @param {Object} options - Опции
+   * @param {string} options.roleId - ID роли
+   * @param {string} options.level - Уровень
+   * @param {string[]} options.currentSkills - Текущие навыки пользователя
    */
-  improveBullet: (locale = 'ru') => `You are an expert tech recruiter who has reviewed 10,000+ resumes.
-
-Your task: Transform the user's bullet point using the XYZ formula:
-"Accomplished [X] as measured by [Y], by doing [Z]"
-
-Guidelines:
-- Start with a strong action verb (Led, Designed, Implemented, Optimized, Reduced, Increased)
-- Include specific metrics (%, $, time saved, users impacted)
-- Highlight the business impact
-- Keep it concise (1-2 lines max)
-- If no metrics provided, estimate realistic ones based on context
-
-Output Language: ${locale === 'ru' ? 'Russian' : 'English'}
-
-IMPORTANT: Return ONLY the improved bullet point, no explanations.`,
-
-  /**
-   * Генерация нескольких вариантов
-   */
-  improveBulletVariants: (locale = 'ru', count = 3) => `You are an expert tech recruiter.
-
-Your task: Generate ${count} different improved versions of the user's bullet point using the XYZ formula.
-
-Each variant should:
-- Use a different action verb
-- Emphasize different aspects (technical, business impact, leadership)
-- Be unique in structure
-
-Output Language: ${locale === 'ru' ? 'Russian' : 'English'}
-
-IMPORTANT: Return ONLY ${count} bullet points, one per line, numbered 1-${count}. No explanations.`,
-
-  /**
-   * Предложение навыков
-   */
-  suggestSkills: (locale = 'ru') => `You are a career advisor specializing in tech industry.
+  suggestSkills: (locale = 'ru', options = {}) => {
+    const { roleId, level = 'middle', currentSkills = [] } = options;
+    const roleContext = roleId ? getRoleContext(roleId, level, locale) : null;
+    
+    const roleTitle = roleContext?.title || '';
+    const roleSkills = roleContext?.skills || {};
+    const atsKeywords = roleContext?.atsKeywords || [];
+    
+    // Формируем список навыков роли
+    const coreSkills = roleSkills.core || [];
+    const advancedSkills = roleSkills.advanced || [];
+    const softSkills = roleSkills.soft || [];
+    
+    return `You are a career advisor specializing in tech industry.
 
 Based on the user's experience and current skills, suggest additional relevant skills they should add to their resume.
+${roleTitle ? `\nTarget Role: ${roleTitle} (${level.toUpperCase()})` : ''}
 
-Guidelines:
+${locale === 'ru' ? `
+=== РУКОВОДСТВО ===
+- Предложи 5-10 навыков
+- Включи как hard skills (технологии), так и soft skills
+- Приоритизируй навыки, востребованные на рынке
+- Учитывай уровень ${level} кандидата
+- НЕ предлагай навыки, которые уже есть у пользователя
+
+${roleContext ? `
+=== НАВЫКИ ДЛЯ РОЛИ ${roleTitle.toUpperCase()} ===
+Базовые (обязательные): ${coreSkills.join(', ')}
+Продвинутые: ${advancedSkills.join(', ')}
+Soft skills: ${softSkills.join(', ')}
+
+=== ATS КЛЮЧЕВЫЕ СЛОВА ===
+${atsKeywords.join(', ')}
+` : ''}
+
+${currentSkills.length > 0 ? `
+=== ТЕКУЩИЕ НАВЫКИ ПОЛЬЗОВАТЕЛЯ (не предлагать) ===
+${currentSkills.join(', ')}
+` : ''}
+` : `
+=== GUIDELINES ===
 - Suggest 5-10 skills
 - Include both hard skills (technologies) and soft skills
 - Prioritize skills that are in high demand
-- Consider the user's career level
+- Consider ${level} level
 - Don't suggest skills they already have
+
+${roleContext ? `
+=== SKILLS FOR ${roleTitle.toUpperCase()} ROLE ===
+Core (required): ${coreSkills.join(', ')}
+Advanced: ${advancedSkills.join(', ')}
+Soft skills: ${softSkills.join(', ')}
+
+=== ATS KEYWORDS ===
+${atsKeywords.join(', ')}
+` : ''}
+
+${currentSkills.length > 0 ? `
+=== USER'S CURRENT SKILLS (don't suggest) ===
+${currentSkills.join(', ')}
+` : ''}
+`}
 
 Output Language: ${locale === 'ru' ? 'Russian' : 'English'}
 
-Format: Return a JSON array of objects: [{"skill": "React", "reason": "Complements your frontend experience"}]`,
+Format: Return a JSON array of objects: [{"skill": "React", "reason": "${locale === 'ru' ? 'Дополняет ваш frontend опыт' : 'Complements your frontend experience'}", "priority": "high|medium|low"}]`;
+  },
 
   /**
    * Проверка грамматики
@@ -339,6 +842,42 @@ Return ONLY the translated text, no explanations.`
 };
 
 /**
+ * Экспорт системы ролей
+ */
+export {
+  // Роли
+  ALL_ROLES,
+  ENGINEERING_ROLES,
+  PRODUCT_ROLES,
+  DESIGN_ROLES,
+  DATA_ROLES,
+  MANAGEMENT_ROLES,
+  QA_ROLES,
+  DEVOPS_ROLES,
+  OTHER_ROLES,
+  // Action Verbs
+  ALL_ACTION_VERBS,
+  ENGINEERING_ACTION_VERBS,
+  PRODUCT_ACTION_VERBS,
+  DESIGN_ACTION_VERBS,
+  DATA_ACTION_VERBS,
+  MANAGEMENT_ACTION_VERBS,
+  QA_ACTION_VERBS,
+  DEVOPS_ACTION_VERBS,
+  OTHER_ACTION_VERBS,
+  // Уровни и категории
+  SENIORITY_LEVELS,
+  ROLE_CATEGORIES,
+  // Утилиты для ролей
+  getRoleContext,
+  getRoleCategory,
+  formatRoleAchievements,
+  formatActionVerbs,
+  formatAtsKeywords,
+  formatLevelFocus
+};
+
+/**
  * Экспорт всех промптов
  */
 export default {
@@ -347,6 +886,19 @@ export default {
   tailor: TAILOR_PROMPTS,
   coverLetter: COVER_LETTER_PROMPTS,
   chat: CHAT_PROMPTS,
-  translation: TRANSLATION_PROMPTS
+  translation: TRANSLATION_PROMPTS,
+  // Утилиты для индустрий (legacy)
+  getSummaryPromptForIndustry,
+  SUPPORTED_INDUSTRIES,
+  // Система ролей (v3)
+  roles: ALL_ROLES,
+  actionVerbs: ALL_ACTION_VERBS,
+  seniorityLevels: SENIORITY_LEVELS,
+  roleCategories: ROLE_CATEGORIES,
+  // Утилиты для ролей
+  getRoleContext,
+  getRoleCategory,
+  formatRoleAchievements,
+  formatActionVerbs,
+  formatAtsKeywords
 };
-
