@@ -7,7 +7,7 @@
 export { Sidebar } from './layouts';
 
 // Common
-export { AIVariantsSelector, AIGenerateButton, AIChatWidget } from './common';
+export { AIVariantsSelector, AIGenerateButton, AIChatWidget, ResumeScoreCard } from './common';
 
 // Features - Profile
 export { EditorForm, ResumePreview } from './features/profile';

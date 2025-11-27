@@ -176,6 +176,62 @@ Best regards,
             model: 'mock'
           });
           break;
+
+        case 'analyze_resume':
+          resolve({
+            content: JSON.stringify({
+              overallScore: 72,
+              scores: {
+                ats: { score: 78, label: locale === 'ru' ? 'ATS Совместимость' : 'ATS Compatibility' },
+                clarity: { score: 65, label: locale === 'ru' ? 'Ясность' : 'Clarity' },
+                impact: { score: 70, label: locale === 'ru' ? 'Импакт' : 'Impact' },
+                completeness: { score: 75, label: locale === 'ru' ? 'Полнота' : 'Completeness' }
+              },
+              strengths: [
+                locale === 'ru' ? 'Хорошая структура резюме' : 'Good resume structure',
+                locale === 'ru' ? 'Указаны ключевые технологии' : 'Key technologies listed',
+                locale === 'ru' ? 'Есть опыт работы с метриками' : 'Experience with metrics included'
+              ],
+              improvements: [
+                {
+                  id: 'summary',
+                  type: 'summary',
+                  priority: 'high',
+                  title: locale === 'ru' ? 'Улучшить Summary' : 'Improve Summary',
+                  description: locale === 'ru' 
+                    ? 'Summary слишком общее. Добавьте конкретные достижения и цифры.' 
+                    : 'Summary is too generic. Add specific achievements and numbers.',
+                  canAutoFix: true
+                },
+                {
+                  id: 'exp1',
+                  type: 'experience',
+                  priority: 'medium',
+                  title: locale === 'ru' ? 'Добавить метрики в опыт' : 'Add metrics to experience',
+                  description: locale === 'ru'
+                    ? 'Второй опыт работы не содержит количественных результатов.'
+                    : 'Second work experience lacks quantitative results.',
+                  canAutoFix: true,
+                  targetId: 2
+                },
+                {
+                  id: 'skills',
+                  type: 'skills',
+                  priority: 'low',
+                  title: locale === 'ru' ? 'Добавить soft skills' : 'Add soft skills',
+                  description: locale === 'ru'
+                    ? 'Рекомендуется добавить 2-3 soft skill для баланса.'
+                    : 'Consider adding 2-3 soft skills for balance.',
+                  canAutoFix: false
+                }
+              ],
+              atsKeywords: ['JavaScript', 'React', 'Node.js', 'TypeScript', 'PostgreSQL'],
+              missingKeywords: ['CI/CD', 'Agile', 'REST API', 'Git']
+            }),
+            provider: 'mock',
+            model: 'mock'
+          });
+          break;
         
         case 'translate':
           resolve({
@@ -442,6 +498,26 @@ ${currentSkills.join(', ')}
       { locale }
     );
     return result.content;
+  },
+
+  /**
+   * Анализ резюме (Health Check)
+   * @param {Object} profile - Профиль пользователя
+   * @param {string} locale - Язык (ru/en)
+   * @returns {Object} Результат анализа с метриками и рекомендациями
+   */
+  analyzeResume: async (profile, locale = 'ru') => {
+    const input = `
+RESUME TO ANALYZE:
+${JSON.stringify(profile, null, 2)}
+`;
+    const result = await callAI(
+      'analyze_resume',
+      prompts.resume.analyzeResume(locale),
+      input,
+      { locale }
+    );
+    return parseJSON(result.content) || result.content;
   },
 
   /**

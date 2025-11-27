@@ -79,12 +79,13 @@
   - [x] `JobsView.jsx` — контейнер с переключением режимов
   - [x] `ResumeDetailView.jsx` — детальный просмотр/редактирование
 
-- [ ] **1.2 Resume Health Check**
-  - [ ] Компонент `ResumeScoreCard.jsx`
-  - [ ] Промпт для AI анализа резюме
-  - [ ] Метрики: Authenticity, ATS, Clarity, Impact
-  - [ ] Рекомендации по улучшению
-  - [ ] Кнопка "Auto-fix" для быстрых исправлений
+- [x] **1.2 Resume Health Check** ✅ (Выполнено 26.11.2025)
+  - [x] Компонент `ResumeScoreCard.jsx` с circular score ring
+  - [x] Промпт для AI анализа резюме (4 критерия)
+  - [x] Метрики: ATS, Clarity, Impact, Completeness
+  - [x] Рекомендации с приоритетами (high/medium/low)
+  - [x] Кнопка "Auto-fix" с интеграцией AI
+  - [x] Ключевые слова ATS + рекомендуемые
 
 - [ ] **1.3 AI для Projects**
   - [ ] Кнопка улучшения описания проекта

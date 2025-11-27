@@ -583,6 +583,100 @@ Format: Return a JSON array of objects: [{"skill": "React", "reason": "${locale 
   },
 
   /**
+   * Анализ резюме (Health Check)
+   * @param {string} locale - Язык (ru/en)
+   */
+  analyzeResume: (locale = 'ru') => `You are an expert resume reviewer and ATS specialist with 15+ years of experience.
+
+Analyze the provided resume and return a comprehensive health check.
+
+${locale === 'ru' ? `
+=== КРИТЕРИИ ОЦЕНКИ ===
+
+1. **ATS Совместимость** (0-100)
+   - Наличие ключевых слов
+   - Стандартные заголовки секций
+   - Отсутствие сложного форматирования
+   - Читаемость парсерами
+
+2. **Ясность** (0-100)
+   - Чёткие формулировки
+   - Отсутствие жаргона без объяснения
+   - Логичная структура
+   - Грамматика и орфография
+
+3. **Импакт** (0-100)
+   - Количественные результаты (%, $, время)
+   - Формула XYZ в достижениях
+   - Конкретные примеры влияния
+   - Сильные action verbs
+
+4. **Полнота** (0-100)
+   - Все обязательные секции заполнены
+   - Достаточно деталей в опыте
+   - Актуальные навыки
+   - Контактная информация
+
+=== ФОРМАТ ОТВЕТА ===
+` : `
+=== EVALUATION CRITERIA ===
+
+1. **ATS Compatibility** (0-100)
+   - Keyword presence
+   - Standard section headers
+   - No complex formatting
+   - Parser readability
+
+2. **Clarity** (0-100)
+   - Clear wording
+   - No unexplained jargon
+   - Logical structure
+   - Grammar and spelling
+
+3. **Impact** (0-100)
+   - Quantitative results (%, $, time)
+   - XYZ formula in achievements
+   - Concrete examples of impact
+   - Strong action verbs
+
+4. **Completeness** (0-100)
+   - All required sections filled
+   - Enough detail in experience
+   - Current skills
+   - Contact information
+
+=== RESPONSE FORMAT ===
+`}
+
+Return JSON:
+{
+  "overallScore": 0-100,
+  "scores": {
+    "ats": { "score": 0-100, "label": "${locale === 'ru' ? 'ATS Совместимость' : 'ATS Compatibility'}" },
+    "clarity": { "score": 0-100, "label": "${locale === 'ru' ? 'Ясность' : 'Clarity'}" },
+    "impact": { "score": 0-100, "label": "${locale === 'ru' ? 'Импакт' : 'Impact'}" },
+    "completeness": { "score": 0-100, "label": "${locale === 'ru' ? 'Полнота' : 'Completeness'}" }
+  },
+  "strengths": ["strength1", "strength2", "strength3"],
+  "improvements": [
+    {
+      "id": "unique_id",
+      "type": "summary|experience|skills|education|projects",
+      "priority": "high|medium|low",
+      "title": "Short title",
+      "description": "Detailed explanation",
+      "canAutoFix": true|false,
+      "targetId": optional_experience_id
+    }
+  ],
+  "atsKeywords": ["keyword1", "keyword2"],
+  "missingKeywords": ["missing1", "missing2"]
+}
+
+Language: ${locale === 'ru' ? 'Russian' : 'English'} for all text fields
+IMPORTANT: Return ONLY valid JSON, no markdown.`,
+
+  /**
    * Проверка грамматики
    */
   grammarCheck: (locale = 'ru') => `You are a professional editor specializing in resume writing.

@@ -25,6 +25,7 @@ import {
   SettingsView,
   JobsView,
   AIChatWidget,
+  ResumeScoreCard,
   PDFDocument
 } from './src/components';
 
@@ -255,28 +256,49 @@ export default function ResumeBuilderApp() {
             </div>
 
             {/* Right Panel: Preview */}
-            <div className="flex-1 h-full bg-slate-100 relative">
-              <div className="absolute top-4 right-6 z-20">
-                <PDFDownloadLink
-                  document={<PDFDocument data={masterProfile} showWatermark={true} />}
-                  fileName={`${masterProfile.personalInfo.fullName || 'Resume'}_CV.pdf`}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow-lg flex items-center font-medium transition-colors"
-                >
-                  {({ loading }) => (
-                    loading ? (
-                      <>
-                        <span className="animate-spin mr-2">⌛</span>
-                        {i18n.language === 'ru' ? 'Готовлю...' : 'Preparing...'}
-                      </>
-                    ) : (
-                      <>
-                        <Download size={16} className="mr-2" />
-                        {i18n.language === 'ru' ? 'Скачать PDF' : 'Download PDF'}
-                      </>
-                    )
-                  )}
-                </PDFDownloadLink>
+            <div className="flex-1 h-full bg-slate-100 relative overflow-hidden">
+              {/* Top Bar: Score Card + Download */}
+              <div className="absolute top-4 left-4 right-4 z-20 flex items-start justify-between pointer-events-none">
+                {/* Resume Health Check */}
+                <div className="pointer-events-auto max-w-sm">
+                  <ResumeScoreCard 
+                    profile={masterProfile} 
+                    isCompact={true}
+                    onAutoFix={async (improvement) => {
+                      // Обработка auto-fix через AI
+                      if (improvement.type === 'summary') {
+                        await handleAIAction('summary');
+                      } else if (improvement.type === 'experience' && improvement.targetId) {
+                        await handleAIAction('experience', improvement.targetId);
+                      }
+                    }}
+                  />
+                </div>
+                
+                {/* Download PDF */}
+                <div className="pointer-events-auto">
+                  <PDFDownloadLink
+                    document={<PDFDocument data={masterProfile} showWatermark={true} />}
+                    fileName={`${masterProfile.personalInfo.fullName || 'Resume'}_CV.pdf`}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow-lg flex items-center font-medium transition-colors"
+                  >
+                    {({ loading }) => (
+                      loading ? (
+                        <>
+                          <span className="animate-spin mr-2">⌛</span>
+                          {i18n.language === 'ru' ? 'Готовлю...' : 'Preparing...'}
+                        </>
+                      ) : (
+                        <>
+                          <Download size={16} className="mr-2" />
+                          {i18n.language === 'ru' ? 'Скачать PDF' : 'Download PDF'}
+                        </>
+                      )
+                    )}
+                  </PDFDownloadLink>
+                </div>
               </div>
+              
               <ResumePreview data={masterProfile} />
             </div>
           </>
