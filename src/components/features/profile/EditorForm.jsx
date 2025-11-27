@@ -17,7 +17,8 @@ import {
   Sparkles,
   X,
   Wand2,
-  Loader2
+  Loader2,
+  Code
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AIVariantsSelector } from '../../common/AIVariantsSelector';
@@ -52,6 +53,11 @@ const EditorForm = ({
   const [suggestedSkills, setSuggestedSkills] = useState([]);
   const [isLoadingSkills, setIsLoadingSkills] = useState(false);
   const [skillsError, setSkillsError] = useState(null);
+
+  // State для AI улучшения проектов
+  const [improvingProjectId, setImprovingProjectId] = useState(null);
+  const [suggestedTech, setSuggestedTech] = useState({});
+  const [loadingTechForProject, setLoadingTechForProject] = useState(null);
 
   // Запрос AI-предложений навыков
   const handleSuggestSkills = async () => {
@@ -92,6 +98,69 @@ const EditorForm = ({
   // Отклонить предложенный навык
   const handleDismissSuggestedSkill = (skill) => {
     setSuggestedSkills(prev => prev.filter(s => s.skill !== skill));
+  };
+
+  // AI улучшение описания проекта
+  const handleImproveProject = async (projectId) => {
+    const project = data.projects.find(p => p.id === projectId);
+    if (!project?.description) return;
+
+    setImprovingProjectId(projectId);
+    try {
+      const improved = await aiService.improveProject(project.description, i18n.language);
+      handleProjectChange(projectId, 'description', improved);
+    } catch (error) {
+      console.error('Project improvement error:', error);
+    } finally {
+      setImprovingProjectId(null);
+    }
+  };
+
+  // Предложить технологии для проекта
+  const handleSuggestTech = async (projectId) => {
+    const project = data.projects.find(p => p.id === projectId);
+    if (!project?.description) return;
+
+    setLoadingTechForProject(projectId);
+    try {
+      const suggestions = await aiService.suggestTechStack(project.description, i18n.language);
+      setSuggestedTech(prev => ({ ...prev, [projectId]: suggestions }));
+    } catch (error) {
+      console.error('Tech suggestion error:', error);
+    } finally {
+      setLoadingTechForProject(null);
+    }
+  };
+
+  // Добавить технологию в описание проекта
+  const handleAddTechToProject = (projectId, tech) => {
+    const project = data.projects.find(p => p.id === projectId);
+    if (!project) return;
+    
+    const currentDesc = project.description || '';
+    const separator = currentDesc.endsWith('.') || !currentDesc ? ' ' : '. ';
+    const techPrefix = i18n.language === 'ru' ? 'Технологии: ' : 'Tech: ';
+    
+    // Проверяем, есть ли уже секция технологий
+    if (currentDesc.toLowerCase().includes('tech:') || currentDesc.toLowerCase().includes('технологии:') || currentDesc.toLowerCase().includes('стек:')) {
+      // Добавляем к существующему списку
+      const newDesc = currentDesc.replace(/(\.|$)/, `, ${tech}$1`);
+      handleProjectChange(projectId, 'description', newDesc);
+    } else {
+      // Добавляем новую секцию
+      handleProjectChange(projectId, 'description', currentDesc + separator + techPrefix + tech);
+    }
+    
+    // Убираем добавленную технологию из предложений
+    setSuggestedTech(prev => ({
+      ...prev,
+      [projectId]: prev[projectId]?.filter(t => t.tech !== tech) || []
+    }));
+  };
+
+  // Скрыть предложения технологий
+  const handleDismissTechSuggestions = (projectId) => {
+    setSuggestedTech(prev => ({ ...prev, [projectId]: [] }));
   };
 
   // Открыть модалку выбора вариантов
@@ -445,43 +514,119 @@ const EditorForm = ({
             </h3>
             
             {data.projects && data.projects.length > 0 ? (
-              data.projects.map((project) => (
-                <div key={project.id} className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 hover:bg-white hover:shadow-md transition-all relative">
-                  <button
-                    onClick={() => {
-                      if (confirm(t('common.confirmDelete'))) {
-                        onDeleteProject(project.id);
-                      }
-                    }}
-                    className="absolute top-2 right-2 text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition-colors"
-                    title={t('common.delete')}
-                  >
-                    <Trash2 size={16} />
-                  </button>
+              data.projects.map((project) => {
+                const isImproving = improvingProjectId === project.id;
+                const isLoadingTech = loadingTechForProject === project.id;
+                const techSuggestions = suggestedTech[project.id] || [];
 
-                  <div className="grid grid-cols-2 gap-3 mb-3 pr-8">
-                    <input 
-                      placeholder="Project Name"
-                      value={project.name || ''}
-                      onChange={(e) => handleProjectChange(project.id, 'name', e.target.value)}
-                      className="p-2 border border-slate-300 rounded text-sm font-bold"
-                    />
-                    <input 
-                      placeholder="GitHub / Demo link"
-                      value={project.link || ''}
-                      onChange={(e) => handleProjectChange(project.id, 'link', e.target.value)}
-                      className="p-2 border border-slate-300 rounded text-sm"
-                    />
+                return (
+                  <div key={project.id} className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 hover:bg-white hover:shadow-md transition-all relative">
+                    <button
+                      onClick={() => {
+                        if (confirm(t('common.confirmDelete'))) {
+                          onDeleteProject(project.id);
+                        }
+                      }}
+                      className="absolute top-2 right-2 text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition-colors"
+                      title={t('common.delete')}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-3 mb-3 pr-8">
+                      <input 
+                        placeholder="Project Name"
+                        value={project.name || ''}
+                        onChange={(e) => handleProjectChange(project.id, 'name', e.target.value)}
+                        className="p-2 border border-slate-300 rounded text-sm font-bold"
+                      />
+                      <input 
+                        placeholder="GitHub / Demo link"
+                        value={project.link || ''}
+                        onChange={(e) => handleProjectChange(project.id, 'link', e.target.value)}
+                        className="p-2 border border-slate-300 rounded text-sm"
+                      />
+                    </div>
+
+                    {/* Description with AI buttons */}
+                    <div className="relative">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-xs font-semibold text-slate-500 uppercase">
+                          {i18n.language === 'ru' ? 'Описание' : 'Description'}
+                        </label>
+                        <div className="flex items-center space-x-2">
+                          {/* Suggest Tech Stack Button */}
+                          <button
+                            onClick={() => handleSuggestTech(project.id)}
+                            disabled={isLoadingTech || !project.description}
+                            className="flex items-center space-x-1 text-xs font-medium text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-2 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isLoadingTech ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <Code size={12} />
+                            )}
+                            <span>{i18n.language === 'ru' ? 'Tech Stack' : 'Tech Stack'}</span>
+                          </button>
+                          {/* Improve Description Button */}
+                          <button
+                            onClick={() => handleImproveProject(project.id)}
+                            disabled={isImproving || !project.description}
+                            className="flex items-center space-x-1 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isImproving ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <Wand2 size={12} />
+                            )}
+                            <span>{i18n.language === 'ru' ? 'Улучшить' : 'Improve'}</span>
+                          </button>
+                        </div>
+                      </div>
+                      <textarea 
+                        rows={3}
+                        value={project.description || ''}
+                        onChange={(e) => handleProjectChange(project.id, 'description', e.target.value)}
+                        placeholder={i18n.language === 'ru' ? "Описание проекта, технологии..." : "Project description, technologies..."}
+                        className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+
+                    {/* Tech Stack Suggestions */}
+                    {techSuggestions.length > 0 && (
+                      <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            <Code size={14} className="text-purple-600" />
+                            <span className="text-xs font-semibold text-purple-800">
+                              {i18n.language === 'ru' ? 'Рекомендуемые технологии' : 'Suggested Technologies'}
+                            </span>
+                          </div>
+                          <button 
+                            onClick={() => handleDismissTechSuggestions(project.id)}
+                            className="text-purple-400 hover:text-purple-600 text-xs"
+                          >
+                            {i18n.language === 'ru' ? 'Скрыть' : 'Hide'}
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {techSuggestions.map((suggestion, index) => (
+                            <button
+                              key={index}
+                              onClick={() => handleAddTechToProject(project.id, suggestion.tech)}
+                              className="bg-white border border-purple-200 rounded px-2 py-1 text-xs hover:border-purple-400 hover:bg-purple-50 transition-colors group flex items-center gap-1"
+                              title={suggestion.reason}
+                            >
+                              <Plus size={10} className="text-purple-500" />
+                              <span className="font-medium text-slate-700">{suggestion.tech}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <textarea 
-                    rows={3}
-                    value={project.description || ''}
-                    onChange={(e) => handleProjectChange(project.id, 'description', e.target.value)}
-                    placeholder={i18n.language === 'ru' ? "Описание проекта, технологии..." : "Project description, technologies..."}
-                    className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="text-center py-10 text-slate-400">
                 <div className="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-2">

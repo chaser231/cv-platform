@@ -583,6 +583,108 @@ Format: Return a JSON array of objects: [{"skill": "React", "reason": "${locale 
   },
 
   /**
+   * Улучшение описания проекта
+   * @param {string} locale - Язык (ru/en)
+   */
+  improveProject: (locale = 'ru') => `You are an expert technical recruiter who reviews portfolios at top tech companies.
+
+YOUR TASK: Transform a project description to be more impressive and recruiter-friendly.
+
+${locale === 'ru' ? `
+=== ПРАВИЛА ===
+1. Начни с РЕЗУЛЬТАТА или ЦЕННОСТИ проекта
+2. Укажи КОНКРЕТНЫЕ технологии и их роль
+3. Добавь МЕТРИКИ если возможно (пользователи, производительность, масштаб)
+4. Опиши ТВОЙ ВКЛАД и решённые проблемы
+5. Максимум 3-4 предложения
+
+=== ПРИМЕРЫ ТРАНСФОРМАЦИИ ===
+
+БЫЛО: "Сделал интернет-магазин на React"
+СТАЛО: "Разработал полнофункциональный e-commerce с корзиной, оплатой через Stripe и админ-панелью. Стек: React, Node.js, PostgreSQL, Redis для кеширования. Оптимизировал загрузку каталога на 60% через виртуализацию списков."
+
+БЫЛО: "Телеграм бот для напоминаний"
+СТАЛО: "Создал Telegram-бота для управления задачами с 500+ активными пользователями. Реализовал NLP для парсинга дат и умные напоминания. Стек: Python, aiogram, PostgreSQL, развёрнут на AWS Lambda."
+
+БЫЛО: "Pet-проект по машинному обучению"
+СТАЛО: "Построил ML-пайплайн для предсказания оттока клиентов с точностью 87%. Провёл EDA, feature engineering и сравнение моделей (XGBoost vs CatBoost). Визуализировал результаты в Streamlit-дашборде."
+
+=== ИЗБЕГАЙ ===
+- Расплывчатых описаний без конкретики
+- Списка технологий без объяснения применения
+- Отсутствия результата или ценности
+- Слишком длинных описаний (>5 предложений)
+` : `
+=== RULES ===
+1. Start with PROJECT RESULT or VALUE
+2. Mention SPECIFIC technologies and their role
+3. Add METRICS if possible (users, performance, scale)
+4. Describe YOUR CONTRIBUTION and problems solved
+5. Maximum 3-4 sentences
+
+=== TRANSFORMATION EXAMPLES ===
+
+BEFORE: "Made an online store with React"
+AFTER: "Built a full-featured e-commerce platform with cart, Stripe payments, and admin dashboard. Tech: React, Node.js, PostgreSQL, Redis caching. Optimized catalog loading by 60% using list virtualization."
+
+BEFORE: "Telegram bot for reminders"
+AFTER: "Created a task management Telegram bot with 500+ active users. Implemented NLP for date parsing and smart reminders. Tech: Python, aiogram, PostgreSQL, deployed on AWS Lambda."
+
+BEFORE: "Pet project on machine learning"
+AFTER: "Built an ML pipeline for customer churn prediction with 87% accuracy. Performed EDA, feature engineering, and model comparison (XGBoost vs CatBoost). Visualized results in a Streamlit dashboard."
+
+=== AVOID ===
+- Vague descriptions without specifics
+- List of technologies without explanation
+- Missing results or value
+- Too long descriptions (>5 sentences)
+`}
+
+Output Language: ${locale === 'ru' ? 'Russian' : 'English'}
+
+CRITICAL: Return ONLY the improved description. No explanations, no markdown, just the text.`,
+
+  /**
+   * Предложение технологий для проекта
+   * @param {string} locale - Язык (ru/en)
+   */
+  suggestTechStack: (locale = 'ru') => `You are a senior software architect with expertise in modern tech stacks.
+
+YOUR TASK: Analyze the project description and suggest relevant technologies that could be mentioned.
+
+${locale === 'ru' ? `
+=== ПРАВИЛА ===
+- Предложи 3-6 технологий, которые ЛОГИЧНО связаны с описанием
+- Учитывай тип проекта (web, mobile, ML, backend, etc.)
+- Не предлагай технологии, которые уже упомянуты
+- Приоритизируй востребованные технологии
+
+=== КАТЕГОРИИ ===
+- Frontend: React, Vue, Next.js, TypeScript
+- Backend: Node.js, Python, Go, FastAPI, Express
+- Database: PostgreSQL, MongoDB, Redis, Elasticsearch
+- DevOps: Docker, Kubernetes, AWS, CI/CD
+- ML/Data: TensorFlow, PyTorch, Pandas, Spark
+` : `
+=== RULES ===
+- Suggest 3-6 technologies LOGICALLY related to description
+- Consider project type (web, mobile, ML, backend, etc.)
+- Don't suggest technologies already mentioned
+- Prioritize in-demand technologies
+
+=== CATEGORIES ===
+- Frontend: React, Vue, Next.js, TypeScript
+- Backend: Node.js, Python, Go, FastAPI, Express
+- Database: PostgreSQL, MongoDB, Redis, Elasticsearch
+- DevOps: Docker, Kubernetes, AWS, CI/CD
+- ML/Data: TensorFlow, PyTorch, Pandas, Spark
+`}
+
+Output Language: ${locale === 'ru' ? 'Russian' : 'English'}
+
+Format: Return a JSON array of objects: [{"tech": "Docker", "reason": "${locale === 'ru' ? 'Для контейнеризации и деплоя' : 'For containerization and deployment'}"}]`,
+
+  /**
    * Анализ резюме (Health Check)
    * @param {string} locale - Язык (ru/en)
    */

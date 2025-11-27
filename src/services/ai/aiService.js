@@ -167,6 +167,29 @@ Best regards,
           });
           break;
 
+        case 'improve_project':
+          resolve({
+            content: locale === 'ru'
+              ? "Разработал полнофункциональный веб-сервис с авторизацией, REST API и интеграцией платёжной системы. Реализовал кеширование на Redis, сократив время отклика на 65%. Стек: React, Node.js, PostgreSQL, Docker. Развёрнут на AWS с CI/CD пайплайном."
+              : "Built a full-featured web service with authentication, REST API, and payment integration. Implemented Redis caching, reducing response time by 65%. Tech: React, Node.js, PostgreSQL, Docker. Deployed on AWS with CI/CD pipeline.",
+            provider: 'mock',
+            model: 'mock'
+          });
+          break;
+
+        case 'suggest_tech':
+          resolve({
+            content: JSON.stringify([
+              { tech: "Docker", reason: locale === 'ru' ? "Для контейнеризации и консистентного окружения" : "For containerization and consistent environment" },
+              { tech: "Redis", reason: locale === 'ru' ? "Для кеширования и улучшения производительности" : "For caching and performance improvement" },
+              { tech: "GitHub Actions", reason: locale === 'ru' ? "Для автоматизации CI/CD" : "For CI/CD automation" },
+              { tech: "Jest", reason: locale === 'ru' ? "Для модульного тестирования" : "For unit testing" }
+            ]),
+            provider: 'mock',
+            model: 'mock'
+          });
+          break;
+
         case 'chat':
           resolve({
             content: locale === 'ru'
@@ -453,6 +476,36 @@ export const aiService = {
       { locale }
     );
     return result.content;
+  },
+
+  /**
+   * Улучшить описание проекта
+   * @param {string} text - Описание проекта
+   * @param {string} locale - Язык (ru/en)
+   */
+  improveProject: async (text, locale = 'ru') => {
+    const result = await callAI(
+      'improve_project',
+      prompts.resume.improveProject(locale),
+      text,
+      { locale }
+    );
+    return result.content;
+  },
+
+  /**
+   * Предложить технологии для проекта
+   * @param {string} description - Описание проекта
+   * @param {string} locale - Язык (ru/en)
+   */
+  suggestTechStack: async (description, locale = 'ru') => {
+    const result = await callAI(
+      'suggest_tech',
+      prompts.resume.suggestTechStack(locale),
+      description,
+      { locale }
+    );
+    return parseJSON(result.content) || [];
   },
   
   /**
