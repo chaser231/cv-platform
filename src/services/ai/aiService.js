@@ -177,16 +177,16 @@ Best regards,
           });
           break;
 
-        case 'suggest_tools':
+        case 'suggest_tools': {
           // Определяем тип проекта по ключевым словам
-          const desc = input.toLowerCase();
-          let suggestions = [];
+          const toolsDesc = input.toLowerCase();
+          let toolsSuggestions = [];
           
           // Дизайн-проект
-          if (desc.includes('ui') || desc.includes('ux') || desc.includes('дизайн') || desc.includes('design') || 
-              desc.includes('интерфейс') || desc.includes('interface') || desc.includes('прототип') || desc.includes('prototype') ||
-              desc.includes('figma') || desc.includes('макет')) {
-            suggestions = [
+          if (toolsDesc.includes('ui') || toolsDesc.includes('ux') || toolsDesc.includes('дизайн') || toolsDesc.includes('design') || 
+              toolsDesc.includes('интерфейс') || toolsDesc.includes('interface') || toolsDesc.includes('прототип') || toolsDesc.includes('prototype') ||
+              toolsDesc.includes('figma') || toolsDesc.includes('макет')) {
+            toolsSuggestions = [
               { item: "Figma", category: "tool", reason: locale === 'ru' ? "Стандарт индустрии для UI/UX дизайна" : "Industry standard for UI/UX design" },
               { item: "Design System", category: "methodology", reason: locale === 'ru' ? "Для масштабируемости и консистентности" : "For scalability and consistency" },
               { item: "Usability Testing", category: "process", reason: locale === 'ru' ? "Валидация решений с пользователями" : "Validating solutions with users" },
@@ -195,10 +195,10 @@ Best regards,
             ];
           }
           // Продуктовый проект
-          else if (desc.includes('product') || desc.includes('продукт') || desc.includes('roadmap') || desc.includes('метрик') ||
-                   desc.includes('metric') || desc.includes('a/b') || desc.includes('гипотез') || desc.includes('hypothesis') ||
-                   desc.includes('backlog') || desc.includes('user stor') || desc.includes('запуск') || desc.includes('launch')) {
-            suggestions = [
+          else if (toolsDesc.includes('product') || toolsDesc.includes('продукт') || toolsDesc.includes('roadmap') || toolsDesc.includes('метрик') ||
+                   toolsDesc.includes('metric') || toolsDesc.includes('a/b') || toolsDesc.includes('гипотез') || toolsDesc.includes('hypothesis') ||
+                   toolsDesc.includes('backlog') || toolsDesc.includes('user stor') || toolsDesc.includes('запуск') || toolsDesc.includes('launch')) {
+            toolsSuggestions = [
               { item: "RICE", category: "framework", reason: locale === 'ru' ? "Приоритизация фич по импакту" : "Feature prioritization by impact" },
               { item: "Jobs-to-be-Done", category: "framework", reason: locale === 'ru' ? "Понимание потребностей пользователей" : "Understanding user needs" },
               { item: "Amplitude", category: "tool", reason: locale === 'ru' ? "Продуктовая аналитика" : "Product analytics" },
@@ -207,10 +207,10 @@ Best regards,
             ];
           }
           // Аналитика/данные
-          else if (desc.includes('анализ') || desc.includes('analysis') || desc.includes('dashboard') || desc.includes('дашборд') ||
-                   desc.includes('sql') || desc.includes('данн') || desc.includes('data') || desc.includes('визуализ') ||
-                   desc.includes('отчёт') || desc.includes('report')) {
-            suggestions = [
+          else if (toolsDesc.includes('анализ') || toolsDesc.includes('analysis') || toolsDesc.includes('dashboard') || toolsDesc.includes('дашборд') ||
+                   toolsDesc.includes('sql') || toolsDesc.includes('данн') || toolsDesc.includes('data') || toolsDesc.includes('визуализ') ||
+                   toolsDesc.includes('отчёт') || toolsDesc.includes('report')) {
+            toolsSuggestions = [
               { item: "SQL", category: "tool", reason: locale === 'ru' ? "Основа работы с данными" : "Foundation for data work" },
               { item: "Tableau", category: "tool", reason: locale === 'ru' ? "Визуализация и дашборды" : "Visualization and dashboards" },
               { item: "Cohort Analysis", category: "methodology", reason: locale === 'ru' ? "Анализ поведения групп пользователей" : "User group behavior analysis" },
@@ -220,7 +220,7 @@ Best regards,
           }
           // По умолчанию — разработка
           else {
-            suggestions = [
+            toolsSuggestions = [
               { item: "Docker", category: "tool", reason: locale === 'ru' ? "Контейнеризация и консистентность окружения" : "Containerization and environment consistency" },
               { item: "CI/CD", category: "process", reason: locale === 'ru' ? "Автоматизация деплоя" : "Deployment automation" },
               { item: "Redis", category: "tool", reason: locale === 'ru' ? "Кеширование для производительности" : "Caching for performance" },
@@ -230,11 +230,12 @@ Best regards,
           }
           
           resolve({
-            content: JSON.stringify(suggestions),
+            content: JSON.stringify(toolsSuggestions),
             provider: 'mock',
             model: 'mock'
           });
           break;
+        }
 
         case 'chat':
           resolve({
