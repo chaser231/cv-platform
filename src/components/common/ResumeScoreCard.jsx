@@ -1,9 +1,10 @@
 /**
  * ResumeScoreCard Component
  * Карточка с анализом резюме (Health Check)
+ * Компактная кнопка по умолчанию, раскрывается при клике
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Activity, 
   CheckCircle2, 
@@ -20,7 +21,6 @@ import {
   FileText,
   Briefcase,
   Code,
-  Plus,
   Copy
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -28,10 +28,10 @@ import aiService from '../../services/ai/aiService';
 
 // Цвета для скоров
 const getScoreColor = (score) => {
-  if (score >= 80) return { bg: 'bg-green-500', text: 'text-green-600', light: 'bg-green-50' };
-  if (score >= 60) return { bg: 'bg-yellow-500', text: 'text-yellow-600', light: 'bg-yellow-50' };
-  if (score >= 40) return { bg: 'bg-orange-500', text: 'text-orange-600', light: 'bg-orange-50' };
-  return { bg: 'bg-red-500', text: 'text-red-600', light: 'bg-red-50' };
+  if (score >= 80) return { bg: 'bg-green-500', text: 'text-green-600', light: 'bg-green-50', border: 'border-green-200' };
+  if (score >= 60) return { bg: 'bg-yellow-500', text: 'text-yellow-600', light: 'bg-yellow-50', border: 'border-yellow-200' };
+  if (score >= 40) return { bg: 'bg-orange-500', text: 'text-orange-600', light: 'bg-orange-50', border: 'border-orange-200' };
+  return { bg: 'bg-red-500', text: 'text-red-600', light: 'bg-red-50', border: 'border-red-200' };
 };
 
 // Иконки для типов улучшений
@@ -45,7 +45,7 @@ const IMPROVEMENT_ICONS = {
 };
 
 // Circular Progress Ring
-const ScoreRing = ({ score, size = 120, strokeWidth = 10 }) => {
+const ScoreRing = ({ score, size = 100, strokeWidth = 8 }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const offset = circumference - (score / 100) * circumference;
@@ -54,7 +54,6 @@ const ScoreRing = ({ score, size = 120, strokeWidth = 10 }) => {
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="transform -rotate-90">
-        {/* Background circle */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -63,7 +62,6 @@ const ScoreRing = ({ score, size = 120, strokeWidth = 10 }) => {
           stroke="#e2e8f0"
           strokeWidth={strokeWidth}
         />
-        {/* Progress circle */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -79,8 +77,8 @@ const ScoreRing = ({ score, size = 120, strokeWidth = 10 }) => {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`text-3xl font-bold ${color.text}`}>{score}</span>
-        <span className="text-xs text-slate-500">/ 100</span>
+        <span className={`text-2xl font-bold ${color.text}`}>{score}</span>
+        <span className="text-[10px] text-slate-400">/ 100</span>
       </div>
     </div>
   );
@@ -92,11 +90,11 @@ const ScoreBar = ({ label, score }) => {
   
   return (
     <div className="space-y-1">
-      <div className="flex justify-between text-sm">
+      <div className="flex justify-between text-xs">
         <span className="text-slate-600">{label}</span>
         <span className={`font-semibold ${color.text}`}>{score}</span>
       </div>
-      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
         <div 
           className={`h-full ${color.bg} transition-all duration-1000`}
           style={{ width: `${score}%` }}
@@ -110,14 +108,13 @@ const ResumeScoreCard = ({
   profile, 
   onAutoFix, 
   onAddSkill,
-  onRemoveDuplicates,
-  isCompact = false 
+  onRemoveDuplicates
 }) => {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const [analysis, setAnalysis] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [isExpanded, setIsExpanded] = useState(!isCompact);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [fixingId, setFixingId] = useState(null);
   const [addedSkills, setAddedSkills] = useState(new Set());
 
@@ -129,11 +126,12 @@ const ResumeScoreCard = ({
     try {
       const result = await aiService.analyzeResume(profile, i18n.language);
       setAnalysis(result);
+      setIsExpanded(true); // Раскрываем после анализа
     } catch (err) {
       console.error('Analysis error:', err);
       setError(i18n.language === 'ru' 
-        ? 'Не удалось проанализировать резюме' 
-        : 'Failed to analyze resume'
+        ? 'Ошибка анализа' 
+        : 'Analysis failed'
       );
     } finally {
       setIsLoading(false);
@@ -146,16 +144,11 @@ const ResumeScoreCard = ({
     
     setFixingId(improvement.id);
     try {
-      // Обработка удаления дубликатов
       if (improvement.type === 'duplicates' && onRemoveDuplicates && improvement.duplicateIds) {
         await onRemoveDuplicates(improvement.duplicateIds, improvement.removeAll);
-      } 
-      // Обработка через AI для других типов
-      else if (onAutoFix) {
+      } else if (onAutoFix) {
         await onAutoFix(improvement);
       }
-      
-      // Перезапускаем анализ после исправления
       await runAnalysis();
     } catch (err) {
       console.error('Auto-fix error:', err);
@@ -164,7 +157,7 @@ const ResumeScoreCard = ({
     }
   };
 
-  // Добавить навык в профиль
+  // Добавить навык
   const handleAddSkill = (skill) => {
     if (onAddSkill && !addedSkills.has(skill)) {
       onAddSkill(skill);
@@ -182,116 +175,116 @@ const ResumeScoreCard = ({
     }
   };
 
-  // Если нет анализа и не загружается - показываем кнопку запуска
-  if (!analysis && !isLoading) {
+  const scoreColor = analysis ? getScoreColor(analysis.overallScore) : null;
+  const recommendationsCount = analysis?.improvements?.length || 0;
+
+  // ============ КОМПАКТНАЯ КНОПКА ============
+  if (!isExpanded) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Activity size={28} className="text-purple-600" />
-          </div>
-          <h3 className="font-semibold text-slate-800 mb-2">
-            {i18n.language === 'ru' ? 'Проверка резюме' : 'Resume Health Check'}
-          </h3>
-          <p className="text-sm text-slate-500 mb-4 max-w-xs mx-auto">
-            {i18n.language === 'ru' 
-              ? 'AI проанализирует ваше резюме и даст рекомендации по улучшению'
-              : 'AI will analyze your resume and provide improvement recommendations'
-            }
-          </p>
-          <button
-            onClick={runAnalysis}
-            className="inline-flex items-center px-6 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
-          >
-            <Sparkles size={18} className="mr-2" />
-            {i18n.language === 'ru' ? 'Запустить анализ' : 'Run Analysis'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Загрузка
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <div className="flex flex-col items-center justify-center py-8">
-          <Loader2 size={40} className="text-purple-600 animate-spin mb-4" />
-          <p className="text-slate-600 font-medium">
-            {i18n.language === 'ru' ? 'Анализирую резюме...' : 'Analyzing resume...'}
-          </p>
-          <p className="text-sm text-slate-400 mt-1">
-            {i18n.language === 'ru' ? 'Это займёт несколько секунд' : 'This will take a few seconds'}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Ошибка
-  if (error) {
-    return (
-      <div className="bg-white rounded-xl border border-red-200 p-6">
-        <div className="flex items-start space-x-3">
-          <AlertCircle className="text-red-500 mt-0.5" size={20} />
-          <div className="flex-1">
-            <p className="text-red-700 font-medium">{error}</p>
-            <button
-              onClick={runAnalysis}
-              className="mt-2 text-sm text-red-600 hover:text-red-700 flex items-center"
-            >
-              <RefreshCw size={14} className="mr-1" />
-              {i18n.language === 'ru' ? 'Попробовать снова' : 'Try again'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Результат анализа
-  const scoreColor = getScoreColor(analysis.overallScore);
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      {/* Header - всегда видимый */}
-      <div 
-        className={`p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors ${isCompact ? '' : 'border-b border-slate-100'}`}
-        onClick={() => setIsExpanded(!isExpanded)}
+      <button
+        onClick={analysis ? () => setIsExpanded(true) : runAnalysis}
+        disabled={isLoading}
+        className={`
+          flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg transition-all
+          ${isLoading 
+            ? 'bg-purple-100 cursor-wait' 
+            : analysis 
+              ? `bg-white border ${scoreColor?.border || 'border-slate-200'} hover:shadow-xl`
+              : 'bg-purple-600 hover:bg-purple-700 text-white'
+          }
+        `}
       >
-        <div className="flex items-center space-x-4">
-          <div className={`w-12 h-12 rounded-full ${scoreColor.light} flex items-center justify-center`}>
-            <span className={`text-lg font-bold ${scoreColor.text}`}>{analysis.overallScore}</span>
-          </div>
+        {isLoading ? (
+          <>
+            <Loader2 size={18} className="animate-spin text-purple-600" />
+            <span className="text-sm font-medium text-purple-600">
+              {i18n.language === 'ru' ? 'Анализ...' : 'Analyzing...'}
+            </span>
+          </>
+        ) : analysis ? (
+          <>
+            <div className={`w-8 h-8 rounded-full ${scoreColor?.light} flex items-center justify-center`}>
+              <span className={`text-sm font-bold ${scoreColor?.text}`}>{analysis.overallScore}</span>
+            </div>
+            <div className="text-left">
+              <div className="text-xs font-semibold text-slate-700">
+                {i18n.language === 'ru' ? 'Оценка' : 'Score'}
+              </div>
+              {recommendationsCount > 0 && (
+                <div className="text-[10px] text-slate-500">
+                  {recommendationsCount} {i18n.language === 'ru' ? 'рек.' : 'rec.'}
+                </div>
+              )}
+            </div>
+            <ChevronDown size={14} className="text-slate-400" />
+          </>
+        ) : (
+          <>
+            <Sparkles size={16} />
+            <span className="text-sm font-medium">
+              {i18n.language === 'ru' ? 'Анализ' : 'Analyze'}
+            </span>
+          </>
+        )}
+      </button>
+    );
+  }
+
+  // ============ РАЗВЁРНУТАЯ КАРТОЧКА ============
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-80 max-h-[70vh] flex flex-col">
+      {/* Header */}
+      <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-xl">
+        <div className="flex items-center gap-2">
+          {analysis && (
+            <div className={`w-8 h-8 rounded-full ${scoreColor?.light} flex items-center justify-center`}>
+              <span className={`text-sm font-bold ${scoreColor?.text}`}>{analysis.overallScore}</span>
+            </div>
+          )}
           <div>
-            <h3 className="font-semibold text-slate-800">
+            <h3 className="text-sm font-semibold text-slate-800">
               {i18n.language === 'ru' ? 'Оценка резюме' : 'Resume Score'}
             </h3>
-            <p className="text-sm text-slate-500">
-              {analysis.improvements?.length || 0} {i18n.language === 'ru' ? 'рекомендаций' : 'recommendations'}
-            </p>
+            {recommendationsCount > 0 && (
+              <p className="text-[10px] text-slate-500">
+                {recommendationsCount} {i18n.language === 'ru' ? 'рекомендаций' : 'recommendations'}
+              </p>
+            )}
           </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-1">
           <button
-            onClick={(e) => { e.stopPropagation(); runAnalysis(); }}
-            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            onClick={runAnalysis}
+            disabled={isLoading}
+            className="p-1.5 hover:bg-slate-200 rounded transition-colors"
             title={i18n.language === 'ru' ? 'Обновить' : 'Refresh'}
           >
-            <RefreshCw size={16} className="text-slate-400" />
+            <RefreshCw size={14} className={`text-slate-400 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
-          {isExpanded ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+          <button
+            onClick={() => setIsExpanded(false)}
+            className="p-1.5 hover:bg-slate-200 rounded transition-colors"
+          >
+            <X size={14} className="text-slate-400" />
+          </button>
         </div>
       </div>
 
-      {/* Expandable content */}
-      {isExpanded && (
-        <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
-          {/* Main Score + Breakdown */}
-          <div className="flex items-start space-x-8">
-            <ScoreRing score={analysis.overallScore} />
-            
-            <div className="flex-1 space-y-3">
+      {/* Error State */}
+      {error && (
+        <div className="p-3 bg-red-50 border-b border-red-100 flex items-center gap-2">
+          <AlertCircle size={14} className="text-red-500" />
+          <span className="text-xs text-red-700">{error}</span>
+        </div>
+      )}
+
+      {/* Content */}
+      {analysis && (
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Score Ring + Bars */}
+          <div className="flex items-center gap-4">
+            <ScoreRing score={analysis.overallScore} size={80} strokeWidth={6} />
+            <div className="flex-1 space-y-2">
               {Object.entries(analysis.scores || {}).map(([key, value]) => (
                 <ScoreBar key={key} label={value.label} score={value.score} />
               ))}
@@ -301,14 +294,14 @@ const ResumeScoreCard = ({
           {/* Strengths */}
           {analysis.strengths?.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center">
-                <CheckCircle2 size={16} className="text-green-500 mr-2" />
+              <h4 className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center">
+                <CheckCircle2 size={12} className="text-green-500 mr-1" />
                 {i18n.language === 'ru' ? 'Сильные стороны' : 'Strengths'}
               </h4>
-              <ul className="space-y-1">
-                {analysis.strengths.map((strength, i) => (
-                  <li key={i} className="text-sm text-slate-600 flex items-start">
-                    <span className="text-green-500 mr-2">✓</span>
+              <ul className="space-y-0.5">
+                {analysis.strengths.slice(0, 3).map((strength, i) => (
+                  <li key={i} className="text-xs text-slate-600 flex items-start">
+                    <span className="text-green-500 mr-1">✓</span>
                     {strength}
                   </li>
                 ))}
@@ -319,11 +312,11 @@ const ResumeScoreCard = ({
           {/* Improvements */}
           {analysis.improvements?.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center">
-                <AlertTriangle size={16} className="text-yellow-500 mr-2" />
+              <h4 className="text-xs font-semibold text-slate-700 mb-2 flex items-center">
+                <AlertTriangle size={12} className="text-yellow-500 mr-1" />
                 {i18n.language === 'ru' ? 'Рекомендации' : 'Recommendations'}
               </h4>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {analysis.improvements.map((improvement) => {
                   const Icon = IMPROVEMENT_ICONS[improvement.type] || Target;
                   const isFixing = fixingId === improvement.id;
@@ -331,27 +324,26 @@ const ResumeScoreCard = ({
                   return (
                     <div 
                       key={improvement.id}
-                      className={`p-3 rounded-lg border ${getPriorityColor(improvement.priority)} flex items-start justify-between`}
+                      className={`p-2 rounded border ${getPriorityColor(improvement.priority)} flex items-start justify-between`}
                     >
-                      <div className="flex items-start space-x-3">
-                        <Icon size={18} className="mt-0.5 opacity-60" />
-                        <div>
-                          <p className="font-medium text-sm">{improvement.title}</p>
-                          <p className="text-xs opacity-80 mt-0.5">{improvement.description}</p>
+                      <div className="flex items-start gap-2 flex-1 min-w-0">
+                        <Icon size={14} className="mt-0.5 opacity-60 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-medium text-xs truncate">{improvement.title}</p>
+                          <p className="text-[10px] opacity-70 line-clamp-2">{improvement.description}</p>
                         </div>
                       </div>
                       {improvement.canAutoFix && onAutoFix && (
                         <button
                           onClick={() => handleAutoFix(improvement)}
                           disabled={isFixing}
-                          className="ml-3 px-3 py-1 bg-white rounded text-xs font-medium hover:bg-slate-50 transition-colors flex items-center disabled:opacity-50"
+                          className="ml-2 px-2 py-0.5 bg-white rounded text-[10px] font-medium hover:bg-slate-50 transition-colors flex items-center flex-shrink-0 disabled:opacity-50"
                         >
                           {isFixing ? (
-                            <Loader2 size={12} className="animate-spin mr-1" />
+                            <Loader2 size={10} className="animate-spin" />
                           ) : (
-                            <Wand2 size={12} className="mr-1" />
+                            <Wand2 size={10} />
                           )}
-                          {i18n.language === 'ru' ? 'Исправить' : 'Fix'}
                         </button>
                       )}
                     </div>
@@ -362,57 +354,34 @@ const ResumeScoreCard = ({
           )}
 
           {/* Keywords */}
-          {(analysis.atsKeywords?.length > 0 || analysis.missingKeywords?.length > 0) && (
-            <div className="grid grid-cols-2 gap-4">
-              {analysis.atsKeywords?.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase mb-2">
-                    {i18n.language === 'ru' ? 'Найденные ключевые слова' : 'Found Keywords'}
-                  </h4>
-                  <div className="flex flex-wrap gap-1">
-                    {analysis.atsKeywords.map((kw, i) => (
-                      <span key={i} className="px-2 py-0.5 bg-green-50 text-green-700 text-xs rounded">
-                        {kw}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {analysis.missingKeywords?.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase mb-2 flex items-center justify-between">
-                    <span>{i18n.language === 'ru' ? 'Рекомендуемые навыки' : 'Suggested Skills'}</span>
-                    {onAddSkill && (
-                      <span className="text-[10px] font-normal text-slate-400">
-                        {i18n.language === 'ru' ? 'нажмите, чтобы добавить' : 'click to add'}
-                      </span>
-                    )}
-                  </h4>
-                  <div className="flex flex-wrap gap-1">
-                    {analysis.missingKeywords.map((kw, i) => {
-                      const isAdded = addedSkills.has(kw);
-                      const canAdd = onAddSkill && !isAdded && !profile.skills?.includes(kw);
-                      
-                      return (
-                        <button
-                          key={i}
-                          onClick={() => canAdd && handleAddSkill(kw)}
-                          disabled={!canAdd}
-                          className={`px-2 py-0.5 text-xs rounded border transition-all ${
-                            isAdded 
-                              ? 'bg-green-100 text-green-700 border-green-300'
-                              : canAdd
-                                ? 'bg-slate-100 text-slate-600 border-dashed border-slate-300 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer'
-                                : 'bg-slate-50 text-slate-400 border-slate-200 cursor-default'
-                          }`}
-                        >
-                          {isAdded ? '✓' : '+'} {kw}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+          {analysis.missingKeywords?.length > 0 && (
+            <div>
+              <h4 className="text-[10px] font-semibold text-slate-500 uppercase mb-1.5">
+                {i18n.language === 'ru' ? 'Рекомендуемые навыки' : 'Suggested Skills'}
+              </h4>
+              <div className="flex flex-wrap gap-1">
+                {analysis.missingKeywords.slice(0, 6).map((kw, i) => {
+                  const isAdded = addedSkills.has(kw);
+                  const canAdd = onAddSkill && !isAdded && !profile.skills?.includes(kw);
+                  
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => canAdd && handleAddSkill(kw)}
+                      disabled={!canAdd}
+                      className={`px-1.5 py-0.5 text-[10px] rounded border transition-all ${
+                        isAdded 
+                          ? 'bg-green-100 text-green-700 border-green-300'
+                          : canAdd
+                            ? 'bg-slate-100 text-slate-600 border-dashed border-slate-300 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer'
+                            : 'bg-slate-50 text-slate-400 border-slate-200 cursor-default'
+                      }`}
+                    >
+                      {isAdded ? '✓' : '+'} {kw}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -422,4 +391,3 @@ const ResumeScoreCard = ({
 };
 
 export default ResumeScoreCard;
-

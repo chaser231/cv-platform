@@ -259,11 +259,10 @@ export default function ResumeBuilderApp() {
             <div className="flex-1 h-full bg-slate-100 relative overflow-hidden">
               {/* Top Bar: Score Card + Download */}
               <div className="absolute top-4 left-4 right-4 z-20 flex items-start justify-between pointer-events-none">
-                {/* Resume Health Check */}
-                <div className="pointer-events-auto max-w-sm">
+                {/* Resume Health Check - компактная кнопка */}
+                <div className="pointer-events-auto">
                   <ResumeScoreCard 
                     profile={masterProfile} 
-                    isCompact={true}
                     onAutoFix={async (improvement) => {
                       // Обработка auto-fix через AI
                       if (improvement.type === 'summary') {
