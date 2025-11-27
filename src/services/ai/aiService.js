@@ -531,13 +531,18 @@ export const aiService = {
    * @param {string} locale - Язык (ru/en)
    */
   improveProject: async (text, locale = 'ru') => {
-    const result = await callAI(
-      'improve_project',
-      prompts.resume.improveProject(locale),
-      text,
-      { locale }
-    );
-    return result.content;
+    try {
+      const result = await callAI(
+        'improve_project',
+        prompts.resume.improveProject(locale),
+        text,
+        { locale }
+      );
+      return result.content || text;
+    } catch (error) {
+      console.error('improveProject error:', error);
+      return text; // Возвращаем оригинал при ошибке
+    }
   },
 
   /**
@@ -552,7 +557,44 @@ export const aiService = {
       description,
       { locale }
     );
-    return parseJSON(result.content) || [];
+    
+    const parsed = parseJSON(result.content);
+    if (parsed) return parsed;
+    
+    // Fallback: если AI вернул не JSON, определяем тип проекта локально
+    const desc = description.toLowerCase();
+    
+    // Дизайн
+    if (desc.includes('ui') || desc.includes('ux') || desc.includes('дизайн') || desc.includes('design') || 
+        desc.includes('figma') || desc.includes('интерфейс') || desc.includes('прототип')) {
+      return [
+        { item: "Figma", category: "tool", reason: locale === 'ru' ? "Стандарт индустрии для UI/UX" : "Industry standard for UI/UX" },
+        { item: "Design System", category: "methodology", reason: locale === 'ru' ? "Масштабируемость дизайна" : "Design scalability" },
+        { item: "Usability Testing", category: "process", reason: locale === 'ru' ? "Валидация с пользователями" : "User validation" }
+      ];
+    }
+    // Продукт
+    if (desc.includes('product') || desc.includes('продукт') || desc.includes('roadmap') || desc.includes('метрик')) {
+      return [
+        { item: "RICE", category: "framework", reason: locale === 'ru' ? "Приоритизация фич" : "Feature prioritization" },
+        { item: "Amplitude", category: "tool", reason: locale === 'ru' ? "Продуктовая аналитика" : "Product analytics" },
+        { item: "OKR", category: "framework", reason: locale === 'ru' ? "Целеполагание" : "Goal setting" }
+      ];
+    }
+    // Аналитика
+    if (desc.includes('анализ') || desc.includes('analysis') || desc.includes('data') || desc.includes('sql')) {
+      return [
+        { item: "SQL", category: "tool", reason: locale === 'ru' ? "Работа с данными" : "Data work" },
+        { item: "Tableau", category: "tool", reason: locale === 'ru' ? "Визуализация" : "Visualization" },
+        { item: "Python/Pandas", category: "tool", reason: locale === 'ru' ? "Автоматизация" : "Automation" }
+      ];
+    }
+    // Разработка (default)
+    return [
+      { item: "Docker", category: "tool", reason: locale === 'ru' ? "Контейнеризация" : "Containerization" },
+      { item: "CI/CD", category: "process", reason: locale === 'ru' ? "Автоматизация деплоя" : "Deployment automation" },
+      { item: "TypeScript", category: "tool", reason: locale === 'ru' ? "Типизация кода" : "Type safety" }
+    ];
   },
   
   /**
