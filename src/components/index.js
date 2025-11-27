@@ -16,7 +16,7 @@ export { EditorForm, ResumePreview } from './features/profile';
 export { SettingsView } from './features/settings';
 
 // Features - Jobs
-export { JobTailoringView } from './features/jobs';
+export { JobsView, JobTailoringView, TailoredResumesList } from './features/jobs';
 
 // PDF
 export { default as PDFDocument } from './PDFDocument';

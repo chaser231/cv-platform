@@ -23,7 +23,7 @@ import {
   EditorForm,
   ResumePreview,
   SettingsView,
-  JobTailoringView,
+  JobsView,
   AIChatWidget,
   PDFDocument
 } from './src/components';
@@ -205,10 +205,9 @@ export default function ResumeBuilderApp() {
             onResetData={handleResetData}
           />
         ) : activeTab === 'jobs' ? (
-          <JobTailoringView 
-            onBack={() => setActiveTab('master')}
-            onSaveTailoredResume={handleSaveTailoredResume}
+          <JobsView 
             masterProfile={masterProfile}
+            onSaveTailoredResume={handleSaveTailoredResume}
           />
         ) : (
           /* Split View Editor */
