@@ -457,12 +457,29 @@ async function callAI(taskType, systemPrompt, userInput, options = {}) {
  * Парсинг JSON из ответа AI
  */
 function parseJSON(content) {
+  if (!content) return null;
+  
   try {
     // Убираем markdown форматирование если есть
     let cleaned = content
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
       .trim();
+    
+    // Пытаемся извлечь JSON из текста (AI может добавить текст до/после)
+    // Ищем начало JSON объекта или массива
+    const jsonStart = cleaned.search(/[\[{]/);
+    if (jsonStart > 0) {
+      cleaned = cleaned.substring(jsonStart);
+    }
+    
+    // Ищем конец JSON (последняя ] или })
+    const lastBracket = cleaned.lastIndexOf(']');
+    const lastBrace = cleaned.lastIndexOf('}');
+    const jsonEnd = Math.max(lastBracket, lastBrace);
+    if (jsonEnd > 0 && jsonEnd < cleaned.length - 1) {
+      cleaned = cleaned.substring(0, jsonEnd + 1);
+    }
     
     // Заменяем PII маркеры на валидные JSON значения
     cleaned = cleaned
@@ -484,6 +501,12 @@ function parseJSON(content) {
         .replace(/```\n?/g, '')
         .replace(/\[PII_[A-Z_]+\]/g, '"masked"')
         .trim();
+      
+      // Извлекаем JSON часть
+      const jsonStart = fixed.search(/[\[{]/);
+      if (jsonStart > 0) {
+        fixed = fixed.substring(jsonStart);
+      }
       
       // Если JSON обрезан — пытаемся закрыть его
       const openBraces = (fixed.match(/{/g) || []).length;

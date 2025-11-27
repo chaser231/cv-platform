@@ -89,6 +89,25 @@ const ROUTING_CONFIG = {
     defaultMaxTokens: 2048 // Увеличен для длинных JSON ответов
   },
   
+  // Предложение инструментов для проекта
+  'suggest_tools': {
+    primary: { provider: 'replicate', model: 'claude-haiku' },
+    russian: { provider: 'yandex', model: 'yandexgpt-lite' },
+    fallback: { provider: 'replicate', model: 'gpt-4o-mini' },
+    timeout: 120000,
+    maxRetries: 2,
+    defaultMaxTokens: 1536 // Для JSON ответов
+  },
+  
+  // Улучшение описания проекта
+  'improve_project': {
+    primary: { provider: 'replicate', model: 'claude-haiku' },
+    russian: { provider: 'yandex', model: 'yandexgpt-lite' },
+    fallback: { provider: 'replicate', model: 'gpt-4o-mini' },
+    timeout: 120000,
+    maxRetries: 2
+  },
+  
   // Cover Letter - Claude 3.7 (лучшее качество)
   'cover_letter': {
     primary: { provider: 'replicate', model: 'claude-3.7' },
