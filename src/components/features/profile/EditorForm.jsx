@@ -116,45 +116,60 @@ const EditorForm = ({
     }
   };
 
-  // Предложить технологии для проекта
-  const handleSuggestTech = async (projectId) => {
+  // Предложить инструменты/методологии для проекта
+  const handleSuggestTools = async (projectId) => {
     const project = data.projects.find(p => p.id === projectId);
     if (!project?.description) return;
 
     setLoadingTechForProject(projectId);
     try {
-      const suggestions = await aiService.suggestTechStack(project.description, i18n.language);
+      const suggestions = await aiService.suggestProjectTools(project.description, i18n.language);
       setSuggestedTech(prev => ({ ...prev, [projectId]: suggestions }));
     } catch (error) {
-      console.error('Tech suggestion error:', error);
+      console.error('Tools suggestion error:', error);
     } finally {
       setLoadingTechForProject(null);
     }
   };
 
-  // Добавить технологию в описание проекта
-  const handleAddTechToProject = (projectId, tech) => {
+  // Добавить инструмент/методологию в описание проекта
+  const handleAddToolToProject = (projectId, item, category) => {
     const project = data.projects.find(p => p.id === projectId);
     if (!project) return;
     
     const currentDesc = project.description || '';
     const separator = currentDesc.endsWith('.') || !currentDesc ? ' ' : '. ';
-    const techPrefix = i18n.language === 'ru' ? 'Технологии: ' : 'Tech: ';
     
-    // Проверяем, есть ли уже секция технологий
-    if (currentDesc.toLowerCase().includes('tech:') || currentDesc.toLowerCase().includes('технологии:') || currentDesc.toLowerCase().includes('стек:')) {
+    // Разные префиксы в зависимости от категории
+    const prefixes = {
+      tool: i18n.language === 'ru' ? 'Инструменты: ' : 'Tools: ',
+      methodology: i18n.language === 'ru' ? 'Методология: ' : 'Methodology: ',
+      process: i18n.language === 'ru' ? 'Процессы: ' : 'Processes: ',
+      framework: i18n.language === 'ru' ? 'Фреймворки: ' : 'Frameworks: '
+    };
+    
+    const prefix = prefixes[category] || prefixes.tool;
+    
+    // Проверяем, есть ли уже секция с инструментами/методологиями
+    const hasToolsSection = currentDesc.toLowerCase().includes('tech:') || 
+                           currentDesc.toLowerCase().includes('технологии:') || 
+                           currentDesc.toLowerCase().includes('инструменты:') ||
+                           currentDesc.toLowerCase().includes('tools:') ||
+                           currentDesc.toLowerCase().includes('стек:');
+    
+    if (hasToolsSection) {
       // Добавляем к существующему списку
-      const newDesc = currentDesc.replace(/(\.|$)/, `, ${tech}$1`);
+      const newDesc = currentDesc.replace(/(\.|$)/, `, ${item}$1`);
       handleProjectChange(projectId, 'description', newDesc);
     } else {
       // Добавляем новую секцию
-      handleProjectChange(projectId, 'description', currentDesc + separator + techPrefix + tech);
+      handleProjectChange(projectId, 'description', currentDesc + separator + prefix + item);
     }
     
-    // Убираем добавленную технологию из предложений
+    // Убираем добавленный инструмент из предложений
     setSuggestedTech(prev => ({
       ...prev,
-      [projectId]: prev[projectId]?.filter(t => t.tech !== tech) || []
+      [projectId]: prev[projectId]?.filter(t => t.item !== item) || []
     }));
   };
 
@@ -555,18 +570,18 @@ const EditorForm = ({
                           {i18n.language === 'ru' ? 'Описание' : 'Description'}
                         </label>
                         <div className="flex items-center space-x-2">
-                          {/* Suggest Tech Stack Button */}
+                          {/* Suggest Tools/Methods Button */}
                           <button
-                            onClick={() => handleSuggestTech(project.id)}
+                            onClick={() => handleSuggestTools(project.id)}
                             disabled={isLoadingTech || !project.description}
                             className="flex items-center space-x-1 text-xs font-medium text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-2 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {isLoadingTech ? (
                               <Loader2 size={12} className="animate-spin" />
                             ) : (
-                              <Code size={12} />
+                              <Sparkles size={12} />
                             )}
-                            <span>{i18n.language === 'ru' ? 'Tech Stack' : 'Tech Stack'}</span>
+                            <span>{i18n.language === 'ru' ? 'Инструменты' : 'Tools'}</span>
                           </button>
                           {/* Improve Description Button */}
                           <button
@@ -592,14 +607,14 @@ const EditorForm = ({
                       />
                     </div>
 
-                    {/* Tech Stack Suggestions */}
+                    {/* Tools/Methods Suggestions */}
                     {techSuggestions.length > 0 && (
                       <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center space-x-2">
-                            <Code size={14} className="text-purple-600" />
+                            <Sparkles size={14} className="text-purple-600" />
                             <span className="text-xs font-semibold text-purple-800">
-                              {i18n.language === 'ru' ? 'Рекомендуемые технологии' : 'Suggested Technologies'}
+                              {i18n.language === 'ru' ? 'Рекомендации' : 'Suggestions'}
                             </span>
                           </div>
                           <button 
@@ -610,18 +625,42 @@ const EditorForm = ({
                           </button>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {techSuggestions.map((suggestion, index) => (
-                            <button
-                              key={index}
-                              onClick={() => handleAddTechToProject(project.id, suggestion.tech)}
-                              className="bg-white border border-purple-200 rounded px-2 py-1 text-xs hover:border-purple-400 hover:bg-purple-50 transition-colors group flex items-center gap-1"
-                              title={suggestion.reason}
-                            >
-                              <Plus size={10} className="text-purple-500" />
-                              <span className="font-medium text-slate-700">{suggestion.tech}</span>
-                            </button>
-                          ))}
+                          {techSuggestions.map((suggestion, index) => {
+                            // Цвета по категориям
+                            const categoryColors = {
+                              tool: 'border-blue-200 hover:border-blue-400 hover:bg-blue-50',
+                              methodology: 'border-green-200 hover:border-green-400 hover:bg-green-50',
+                              process: 'border-orange-200 hover:border-orange-400 hover:bg-orange-50',
+                              framework: 'border-purple-200 hover:border-purple-400 hover:bg-purple-50'
+                            };
+                            const categoryLabels = {
+                              tool: i18n.language === 'ru' ? '🔧' : '🔧',
+                              methodology: i18n.language === 'ru' ? '📐' : '📐',
+                              process: i18n.language === 'ru' ? '🔄' : '🔄',
+                              framework: i18n.language === 'ru' ? '📊' : '📊'
+                            };
+                            const colorClass = categoryColors[suggestion.category] || categoryColors.tool;
+                            const emoji = categoryLabels[suggestion.category] || '🔧';
+                            
+                            return (
+                              <button
+                                key={index}
+                                onClick={() => handleAddToolToProject(project.id, suggestion.item, suggestion.category)}
+                                className={`bg-white border rounded px-2 py-1.5 text-xs transition-colors group flex items-center gap-1.5 ${colorClass}`}
+                                title={suggestion.reason}
+                              >
+                                <span>{emoji}</span>
+                                <span className="font-medium text-slate-700">{suggestion.item}</span>
+                                <Plus size={10} className="text-slate-400 group-hover:text-slate-600" />
+                              </button>
+                            );
+                          })}
                         </div>
+                        <p className="text-[10px] text-purple-500 mt-2">
+                          {i18n.language === 'ru' 
+                            ? '🔧 инструмент • 📐 методология • 🔄 процесс • 📊 фреймворк' 
+                            : '🔧 tool • 📐 methodology • 🔄 process • 📊 framework'}
+                        </p>
                       </div>
                     )}
                   </div>

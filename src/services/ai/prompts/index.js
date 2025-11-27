@@ -645,44 +645,77 @@ Output Language: ${locale === 'ru' ? 'Russian' : 'English'}
 CRITICAL: Return ONLY the improved description. No explanations, no markdown, just the text.`,
 
   /**
-   * Предложение технологий для проекта
+   * Предложение инструментов/методологий для проекта (универсально для разных ролей)
    * @param {string} locale - Язык (ru/en)
    */
-  suggestTechStack: (locale = 'ru') => `You are a senior software architect with expertise in modern tech stacks.
+  suggestProjectTools: (locale = 'ru') => `You are an expert career coach who understands tools, frameworks, and methodologies across different IT roles.
 
-YOUR TASK: Analyze the project description and suggest relevant technologies that could be mentioned.
+YOUR TASK: Analyze the project description and suggest relevant tools, technologies, frameworks, or methodologies that could strengthen this project description.
+
+FIRST: Detect the project type/role from the description:
+- DEVELOPMENT: code, API, app, website, backend, frontend, database, algorithm
+- DESIGN: UI, UX, interface, prototype, wireframe, user research, visual, Figma
+- PRODUCT: roadmap, metrics, A/B test, user stories, backlog, stakeholders, launch
+- DATA/ANALYTICS: analysis, dashboard, metrics, SQL, visualization, insights
+- MARKETING: campaign, SEO, content, conversion, funnel, audience
 
 ${locale === 'ru' ? `
+=== ДЛЯ РАЗРАБОТЧИКОВ ===
+Технологии: React, Vue, Node.js, Python, Docker, AWS, PostgreSQL, Redis, GraphQL, TypeScript
+DevOps: CI/CD, Kubernetes, GitHub Actions, Terraform
+
+=== ДЛЯ ДИЗАЙНЕРОВ ===
+Инструменты: Figma, Sketch, Adobe XD, Principle, Framer, Miro, FigJam
+Методологии: Design Thinking, User-Centered Design, Atomic Design, Design System
+Процессы: User Research, Competitive Analysis, Wireframing, Prototyping, Usability Testing
+Артефакты: User Personas, Journey Maps, Information Architecture
+
+=== ДЛЯ ПРОДАКТ-МЕНЕДЖЕРОВ ===
+Фреймворки: Jobs-to-be-Done, RICE, MoSCoW, Kano Model, OKR, North Star Metric
+Методологии: Agile, Scrum, Kanban, Lean Startup, Design Sprint, Discovery
+Инструменты: Jira, Amplitude, Mixpanel, Hotjar, Productboard, Notion
+Процессы: Customer Development, A/B Testing, Cohort Analysis, Funnel Analysis
+
+=== ДЛЯ АНАЛИТИКОВ ===
+Инструменты: SQL, Python, Tableau, Power BI, Looker, Google Analytics, Amplitude
+Методы: Cohort Analysis, Funnel Analysis, Retention Analysis, Statistical Testing
+
 === ПРАВИЛА ===
-- Предложи 3-6 технологий, которые ЛОГИЧНО связаны с описанием
-- Учитывай тип проекта (web, mobile, ML, backend, etc.)
-- Не предлагай технологии, которые уже упомянуты
-- Приоритизируй востребованные технологии
-
-=== КАТЕГОРИИ ===
-- Frontend: React, Vue, Next.js, TypeScript
-- Backend: Node.js, Python, Go, FastAPI, Express
-- Database: PostgreSQL, MongoDB, Redis, Elasticsearch
-- DevOps: Docker, Kubernetes, AWS, CI/CD
-- ML/Data: TensorFlow, PyTorch, Pandas, Spark
+- Предложи 4-6 релевантных пунктов
+- Определи роль по описанию и предлагай СООТВЕТСТВУЮЩИЕ инструменты
+- Не предлагай то, что уже упомянуто
+- Включай категорию в reason (инструмент/методология/процесс)
 ` : `
-=== RULES ===
-- Suggest 3-6 technologies LOGICALLY related to description
-- Consider project type (web, mobile, ML, backend, etc.)
-- Don't suggest technologies already mentioned
-- Prioritize in-demand technologies
+=== FOR DEVELOPERS ===
+Technologies: React, Vue, Node.js, Python, Docker, AWS, PostgreSQL, Redis, GraphQL, TypeScript
+DevOps: CI/CD, Kubernetes, GitHub Actions, Terraform
 
-=== CATEGORIES ===
-- Frontend: React, Vue, Next.js, TypeScript
-- Backend: Node.js, Python, Go, FastAPI, Express
-- Database: PostgreSQL, MongoDB, Redis, Elasticsearch
-- DevOps: Docker, Kubernetes, AWS, CI/CD
-- ML/Data: TensorFlow, PyTorch, Pandas, Spark
+=== FOR DESIGNERS ===
+Tools: Figma, Sketch, Adobe XD, Principle, Framer, Miro, FigJam
+Methodologies: Design Thinking, User-Centered Design, Atomic Design, Design System
+Processes: User Research, Competitive Analysis, Wireframing, Prototyping, Usability Testing
+Artifacts: User Personas, Journey Maps, Information Architecture
+
+=== FOR PRODUCT MANAGERS ===
+Frameworks: Jobs-to-be-Done, RICE, MoSCoW, Kano Model, OKR, North Star Metric
+Methodologies: Agile, Scrum, Kanban, Lean Startup, Design Sprint, Discovery
+Tools: Jira, Amplitude, Mixpanel, Hotjar, Productboard, Notion
+Processes: Customer Development, A/B Testing, Cohort Analysis, Funnel Analysis
+
+=== FOR ANALYSTS ===
+Tools: SQL, Python, Tableau, Power BI, Looker, Google Analytics, Amplitude
+Methods: Cohort Analysis, Funnel Analysis, Retention Analysis, Statistical Testing
+
+=== RULES ===
+- Suggest 4-6 relevant items
+- Detect role from description and suggest APPROPRIATE tools
+- Don't suggest what's already mentioned
+- Include category in reason (tool/methodology/process)
 `}
 
 Output Language: ${locale === 'ru' ? 'Russian' : 'English'}
 
-Format: Return a JSON array of objects: [{"tech": "Docker", "reason": "${locale === 'ru' ? 'Для контейнеризации и деплоя' : 'For containerization and deployment'}"}]`,
+Format: Return JSON array: [{"item": "Figma", "category": "tool|methodology|process|framework", "reason": "${locale === 'ru' ? 'Стандарт индустрии для UI/UX дизайна' : 'Industry standard for UI/UX design'}"}]`,
 
   /**
    * Анализ резюме (Health Check)

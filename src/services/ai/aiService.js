@@ -177,14 +177,60 @@ Best regards,
           });
           break;
 
-        case 'suggest_tech':
+        case 'suggest_tools':
+          // Определяем тип проекта по ключевым словам
+          const desc = input.toLowerCase();
+          let suggestions = [];
+          
+          // Дизайн-проект
+          if (desc.includes('ui') || desc.includes('ux') || desc.includes('дизайн') || desc.includes('design') || 
+              desc.includes('интерфейс') || desc.includes('interface') || desc.includes('прототип') || desc.includes('prototype') ||
+              desc.includes('figma') || desc.includes('макет')) {
+            suggestions = [
+              { item: "Figma", category: "tool", reason: locale === 'ru' ? "Стандарт индустрии для UI/UX дизайна" : "Industry standard for UI/UX design" },
+              { item: "Design System", category: "methodology", reason: locale === 'ru' ? "Для масштабируемости и консистентности" : "For scalability and consistency" },
+              { item: "Usability Testing", category: "process", reason: locale === 'ru' ? "Валидация решений с пользователями" : "Validating solutions with users" },
+              { item: "User Personas", category: "process", reason: locale === 'ru' ? "Понимание целевой аудитории" : "Understanding target audience" },
+              { item: "Design Thinking", category: "methodology", reason: locale === 'ru' ? "Человекоцентричный подход к дизайну" : "Human-centered design approach" }
+            ];
+          }
+          // Продуктовый проект
+          else if (desc.includes('product') || desc.includes('продукт') || desc.includes('roadmap') || desc.includes('метрик') ||
+                   desc.includes('metric') || desc.includes('a/b') || desc.includes('гипотез') || desc.includes('hypothesis') ||
+                   desc.includes('backlog') || desc.includes('user stor') || desc.includes('запуск') || desc.includes('launch')) {
+            suggestions = [
+              { item: "RICE", category: "framework", reason: locale === 'ru' ? "Приоритизация фич по импакту" : "Feature prioritization by impact" },
+              { item: "Jobs-to-be-Done", category: "framework", reason: locale === 'ru' ? "Понимание потребностей пользователей" : "Understanding user needs" },
+              { item: "Amplitude", category: "tool", reason: locale === 'ru' ? "Продуктовая аналитика" : "Product analytics" },
+              { item: "A/B Testing", category: "process", reason: locale === 'ru' ? "Валидация гипотез данными" : "Data-driven hypothesis validation" },
+              { item: "OKR", category: "framework", reason: locale === 'ru' ? "Выравнивание целей команды" : "Aligning team goals" }
+            ];
+          }
+          // Аналитика/данные
+          else if (desc.includes('анализ') || desc.includes('analysis') || desc.includes('dashboard') || desc.includes('дашборд') ||
+                   desc.includes('sql') || desc.includes('данн') || desc.includes('data') || desc.includes('визуализ') ||
+                   desc.includes('отчёт') || desc.includes('report')) {
+            suggestions = [
+              { item: "SQL", category: "tool", reason: locale === 'ru' ? "Основа работы с данными" : "Foundation for data work" },
+              { item: "Tableau", category: "tool", reason: locale === 'ru' ? "Визуализация и дашборды" : "Visualization and dashboards" },
+              { item: "Cohort Analysis", category: "methodology", reason: locale === 'ru' ? "Анализ поведения групп пользователей" : "User group behavior analysis" },
+              { item: "Python/Pandas", category: "tool", reason: locale === 'ru' ? "Автоматизация аналитики" : "Analytics automation" },
+              { item: "Statistical Testing", category: "methodology", reason: locale === 'ru' ? "Статистическая значимость выводов" : "Statistical significance of conclusions" }
+            ];
+          }
+          // По умолчанию — разработка
+          else {
+            suggestions = [
+              { item: "Docker", category: "tool", reason: locale === 'ru' ? "Контейнеризация и консистентность окружения" : "Containerization and environment consistency" },
+              { item: "CI/CD", category: "process", reason: locale === 'ru' ? "Автоматизация деплоя" : "Deployment automation" },
+              { item: "Redis", category: "tool", reason: locale === 'ru' ? "Кеширование для производительности" : "Caching for performance" },
+              { item: "TypeScript", category: "tool", reason: locale === 'ru' ? "Типизация для надёжности кода" : "Type safety for code reliability" },
+              { item: "Jest", category: "tool", reason: locale === 'ru' ? "Модульное тестирование" : "Unit testing" }
+            ];
+          }
+          
           resolve({
-            content: JSON.stringify([
-              { tech: "Docker", reason: locale === 'ru' ? "Для контейнеризации и консистентного окружения" : "For containerization and consistent environment" },
-              { tech: "Redis", reason: locale === 'ru' ? "Для кеширования и улучшения производительности" : "For caching and performance improvement" },
-              { tech: "GitHub Actions", reason: locale === 'ru' ? "Для автоматизации CI/CD" : "For CI/CD automation" },
-              { tech: "Jest", reason: locale === 'ru' ? "Для модульного тестирования" : "For unit testing" }
-            ]),
+            content: JSON.stringify(suggestions),
             provider: 'mock',
             model: 'mock'
           });
@@ -494,14 +540,14 @@ export const aiService = {
   },
 
   /**
-   * Предложить технологии для проекта
+   * Предложить инструменты/методологии для проекта (универсально для разных ролей)
    * @param {string} description - Описание проекта
    * @param {string} locale - Язык (ru/en)
    */
-  suggestTechStack: async (description, locale = 'ru') => {
+  suggestProjectTools: async (description, locale = 'ru') => {
     const result = await callAI(
-      'suggest_tech',
-      prompts.resume.suggestTechStack(locale),
+      'suggest_tools',
+      prompts.resume.suggestProjectTools(locale),
       description,
       { locale }
     );
