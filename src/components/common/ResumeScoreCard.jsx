@@ -117,6 +117,7 @@ const ResumeScoreCard = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [fixingId, setFixingId] = useState(null);
   const [addedSkills, setAddedSkills] = useState(new Set());
+  const [expandedRecommendation, setExpandedRecommendation] = useState(null);
 
   // Анализ резюме
   const runAnalysis = async () => {
@@ -320,31 +321,64 @@ const ResumeScoreCard = ({
                 {analysis.improvements.map((improvement) => {
                   const Icon = IMPROVEMENT_ICONS[improvement.type] || Target;
                   const isFixing = fixingId === improvement.id;
+                  const isItemExpanded = expandedRecommendation === improvement.id;
                   
                   return (
                     <div 
                       key={improvement.id}
-                      className={`p-2 rounded border ${getPriorityColor(improvement.priority)} flex items-start justify-between`}
+                      className={`rounded border ${getPriorityColor(improvement.priority)} overflow-hidden transition-all`}
                     >
-                      <div className="flex items-start gap-2 flex-1 min-w-0">
-                        <Icon size={14} className="mt-0.5 opacity-60 flex-shrink-0" />
-                        <div className="min-w-0">
-                          <p className="font-medium text-xs truncate">{improvement.title}</p>
-                          <p className="text-[10px] opacity-70 line-clamp-2">{improvement.description}</p>
+                      {/* Header - кликабельный */}
+                      <div 
+                        className="p-2 flex items-start justify-between cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => setExpandedRecommendation(isItemExpanded ? null : improvement.id)}
+                      >
+                        <div className="flex items-start gap-2 flex-1 min-w-0">
+                          <Icon size={14} className="mt-0.5 opacity-60 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className={`font-medium text-xs ${isItemExpanded ? '' : 'truncate'}`}>
+                              {improvement.title}
+                            </p>
+                            {!isItemExpanded && (
+                              <p className="text-[10px] opacity-70 line-clamp-1">{improvement.description}</p>
+                            )}
+                          </div>
                         </div>
+                        <ChevronDown 
+                          size={14} 
+                          className={`flex-shrink-0 opacity-40 transition-transform ${isItemExpanded ? 'rotate-180' : ''}`} 
+                        />
                       </div>
-                      {improvement.canAutoFix && onAutoFix && (
-                        <button
-                          onClick={() => handleAutoFix(improvement)}
-                          disabled={isFixing}
-                          className="ml-2 px-2 py-0.5 bg-white rounded text-[10px] font-medium hover:bg-slate-50 transition-colors flex items-center flex-shrink-0 disabled:opacity-50"
-                        >
-                          {isFixing ? (
-                            <Loader2 size={10} className="animate-spin" />
-                          ) : (
-                            <Wand2 size={10} />
+                      
+                      {/* Expanded content */}
+                      {isItemExpanded && (
+                        <div className="px-2 pb-2 pt-0">
+                          <p className="text-[11px] opacity-80 mb-2 pl-6">
+                            {improvement.description}
+                          </p>
+                          {improvement.canAutoFix && onAutoFix && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAutoFix(improvement);
+                              }}
+                              disabled={isFixing}
+                              className="ml-6 px-3 py-1 bg-white rounded text-[10px] font-medium hover:bg-slate-50 transition-colors flex items-center disabled:opacity-50 border border-current/20"
+                            >
+                              {isFixing ? (
+                                <>
+                                  <Loader2 size={10} className="animate-spin mr-1" />
+                                  {i18n.language === 'ru' ? 'Исправляю...' : 'Fixing...'}
+                                </>
+                              ) : (
+                                <>
+                                  <Wand2 size={10} className="mr-1" />
+                                  {i18n.language === 'ru' ? 'Исправить автоматически' : 'Auto-fix'}
+                                </>
+                              )}
+                            </button>
                           )}
-                        </button>
+                        </div>
                       )}
                     </div>
                   );
