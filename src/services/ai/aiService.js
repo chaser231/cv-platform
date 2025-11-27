@@ -459,13 +459,24 @@ async function callAI(taskType, systemPrompt, userInput, options = {}) {
 function parseJSON(content) {
   try {
     // Убираем markdown форматирование если есть
-    const cleaned = content
+    let cleaned = content
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
       .trim();
+    
+    // Заменяем PII маркеры на валидные JSON значения
+    // [PII_PHONE] и подобные могут ломать JSON если попадают в числовые поля
+    cleaned = cleaned
+      .replace(/\[PII_PHONE\]/g, '"masked_phone"')
+      .replace(/\[PII_EMAIL\]/g, '"masked_email"')
+      .replace(/\[PII_NAME\]/g, '"masked_name"')
+      .replace(/\[PII_ADDRESS\]/g, '"masked_address"')
+      .replace(/\[PII_[A-Z_]+\]/g, '"masked"');
+    
     return JSON.parse(cleaned);
   } catch (e) {
     console.error('Failed to parse AI JSON response:', e);
+    console.error('Content was:', content?.substring(0, 500));
     return null;
   }
 }
@@ -762,7 +773,58 @@ ${JSON.stringify(profile, null, 2)}
       input,
       { locale }
     );
-    return parseJSON(result.content) || result.content;
+    
+    const parsed = parseJSON(result.content);
+    if (parsed && parsed.overallScore !== undefined) {
+      return parsed;
+    }
+    
+    // Fallback: базовый анализ если AI вернул некорректный ответ
+    const hasExperience = profile.experience?.length > 0;
+    const hasSkills = profile.skills?.length > 0;
+    const hasSummary = profile.summary?.length > 50;
+    const hasProjects = profile.projects?.length > 0;
+    
+    const baseScore = 40 + 
+      (hasExperience ? 15 : 0) + 
+      (hasSkills ? 15 : 0) + 
+      (hasSummary ? 15 : 0) + 
+      (hasProjects ? 10 : 0);
+    
+    return {
+      overallScore: Math.min(baseScore, 85),
+      scores: {
+        ats: { score: hasSkills ? 70 : 50, label: locale === 'ru' ? 'ATS Совместимость' : 'ATS Compatibility' },
+        clarity: { score: hasSummary ? 65 : 45, label: locale === 'ru' ? 'Ясность' : 'Clarity' },
+        impact: { score: hasExperience ? 60 : 40, label: locale === 'ru' ? 'Импакт' : 'Impact' },
+        completeness: { score: baseScore, label: locale === 'ru' ? 'Полнота' : 'Completeness' }
+      },
+      strengths: [
+        hasExperience ? (locale === 'ru' ? 'Указан опыт работы' : 'Work experience listed') : null,
+        hasSkills ? (locale === 'ru' ? 'Есть список навыков' : 'Skills listed') : null,
+        hasSummary ? (locale === 'ru' ? 'Есть профессиональное резюме' : 'Professional summary present') : null
+      ].filter(Boolean),
+      improvements: [
+        !hasSummary ? {
+          id: 'summary',
+          type: 'summary',
+          priority: 'high',
+          title: locale === 'ru' ? 'Добавить Summary' : 'Add Summary',
+          description: locale === 'ru' ? 'Профессиональное резюме помогает рекрутерам быстро понять ваш профиль' : 'Professional summary helps recruiters quickly understand your profile',
+          canAutoFix: true
+        } : null,
+        !hasProjects ? {
+          id: 'projects',
+          type: 'projects',
+          priority: 'medium',
+          title: locale === 'ru' ? 'Добавить проекты' : 'Add projects',
+          description: locale === 'ru' ? 'Проекты демонстрируют практический опыт' : 'Projects demonstrate practical experience',
+          canAutoFix: false
+        } : null
+      ].filter(Boolean),
+      atsKeywords: profile.skills?.slice(0, 5) || [],
+      missingKeywords: ['Git', 'Agile', 'CI/CD', 'REST API'].filter(kw => !profile.skills?.includes(kw))
+    };
   },
 
   /**
