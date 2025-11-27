@@ -19,7 +19,9 @@ import {
   Target,
   FileText,
   Briefcase,
-  Code
+  Code,
+  Plus,
+  Copy
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import aiService from '../../services/ai/aiService';
@@ -38,7 +40,8 @@ const IMPROVEMENT_ICONS = {
   experience: Briefcase,
   skills: Code,
   education: Target,
-  projects: Target
+  projects: Target,
+  duplicates: Copy
 };
 
 // Circular Progress Ring
@@ -103,13 +106,20 @@ const ScoreBar = ({ label, score }) => {
   );
 };
 
-const ResumeScoreCard = ({ profile, onAutoFix, isCompact = false }) => {
+const ResumeScoreCard = ({ 
+  profile, 
+  onAutoFix, 
+  onAddSkill,
+  onRemoveDuplicates,
+  isCompact = false 
+}) => {
   const { t, i18n } = useTranslation();
   const [analysis, setAnalysis] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isExpanded, setIsExpanded] = useState(!isCompact);
   const [fixingId, setFixingId] = useState(null);
+  const [addedSkills, setAddedSkills] = useState(new Set());
 
   // Анализ резюме
   const runAnalysis = async () => {
@@ -132,17 +142,33 @@ const ResumeScoreCard = ({ profile, onAutoFix, isCompact = false }) => {
 
   // Auto-fix improvement
   const handleAutoFix = async (improvement) => {
-    if (!improvement.canAutoFix || !onAutoFix) return;
+    if (!improvement.canAutoFix) return;
     
     setFixingId(improvement.id);
     try {
-      await onAutoFix(improvement);
+      // Обработка удаления дубликатов
+      if (improvement.type === 'duplicates' && onRemoveDuplicates && improvement.duplicateIds) {
+        await onRemoveDuplicates(improvement.duplicateIds, improvement.removeAll);
+      } 
+      // Обработка через AI для других типов
+      else if (onAutoFix) {
+        await onAutoFix(improvement);
+      }
+      
       // Перезапускаем анализ после исправления
       await runAnalysis();
     } catch (err) {
       console.error('Auto-fix error:', err);
     } finally {
       setFixingId(null);
+    }
+  };
+
+  // Добавить навык в профиль
+  const handleAddSkill = (skill) => {
+    if (onAddSkill && !addedSkills.has(skill)) {
+      onAddSkill(skill);
+      setAddedSkills(prev => new Set([...prev, skill]));
     }
   };
 
@@ -260,7 +286,7 @@ const ResumeScoreCard = ({ profile, onAutoFix, isCompact = false }) => {
 
       {/* Expandable content */}
       {isExpanded && (
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
           {/* Main Score + Breakdown */}
           <div className="flex items-start space-x-8">
             <ScoreRing score={analysis.overallScore} />
@@ -354,15 +380,36 @@ const ResumeScoreCard = ({ profile, onAutoFix, isCompact = false }) => {
               )}
               {analysis.missingKeywords?.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase mb-2">
-                    {i18n.language === 'ru' ? 'Рекомендуемые' : 'Suggested'}
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase mb-2 flex items-center justify-between">
+                    <span>{i18n.language === 'ru' ? 'Рекомендуемые навыки' : 'Suggested Skills'}</span>
+                    {onAddSkill && (
+                      <span className="text-[10px] font-normal text-slate-400">
+                        {i18n.language === 'ru' ? 'нажмите, чтобы добавить' : 'click to add'}
+                      </span>
+                    )}
                   </h4>
                   <div className="flex flex-wrap gap-1">
-                    {analysis.missingKeywords.map((kw, i) => (
-                      <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded border border-dashed border-slate-300">
-                        + {kw}
-                      </span>
-                    ))}
+                    {analysis.missingKeywords.map((kw, i) => {
+                      const isAdded = addedSkills.has(kw);
+                      const canAdd = onAddSkill && !isAdded && !profile.skills?.includes(kw);
+                      
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => canAdd && handleAddSkill(kw)}
+                          disabled={!canAdd}
+                          className={`px-2 py-0.5 text-xs rounded border transition-all ${
+                            isAdded 
+                              ? 'bg-green-100 text-green-700 border-green-300'
+                              : canAdd
+                                ? 'bg-slate-100 text-slate-600 border-dashed border-slate-300 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer'
+                                : 'bg-slate-50 text-slate-400 border-slate-200 cursor-default'
+                          }`}
+                        >
+                          {isAdded ? '✓' : '+'} {kw}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

@@ -617,6 +617,12 @@ ${locale === 'ru' ? `
    - Актуальные навыки
    - Контактная информация
 
+5. **Проверка дубликатов**
+   - Проверь записи опыта на повторения
+   - Дубликаты: одинаковая компания + роль + даты
+   - Похожие записи: одинаковая компания с разными описаниями
+   - Верни ID дубликатов для удаления
+
 === ФОРМАТ ОТВЕТА ===
 ` : `
 === EVALUATION CRITERIA ===
@@ -645,6 +651,12 @@ ${locale === 'ru' ? `
    - Current skills
    - Contact information
 
+5. **Duplicate Detection**
+   - Check experience entries for duplicates
+   - Duplicates: same company + role + dates
+   - Similar entries: same company with different descriptions
+   - Return IDs of duplicates for removal
+
 === RESPONSE FORMAT ===
 `}
 
@@ -661,12 +673,13 @@ Return JSON:
   "improvements": [
     {
       "id": "unique_id",
-      "type": "summary|experience|skills|education|projects",
+      "type": "summary|experience|skills|education|projects|duplicates",
       "priority": "high|medium|low",
       "title": "Short title",
       "description": "Detailed explanation",
       "canAutoFix": true|false,
-      "targetId": optional_experience_id
+      "targetId": optional_experience_id,
+      "duplicateIds": [id1, id2] // Only for type="duplicates" - IDs of duplicate experience entries
     }
   ],
   "atsKeywords": ["keyword1", "keyword2"],

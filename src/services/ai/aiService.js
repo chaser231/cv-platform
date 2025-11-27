@@ -178,55 +178,158 @@ Best regards,
           break;
 
         case 'analyze_resume':
+          // Проверяем дубликаты в переданных данных (для реалистичного мока)
+          let inputData = {};
+          let experience = [];
+          const duplicateGroups = [];
+          
+          try {
+            // Пытаемся распарсить, но input может быть поврежден PII маскированием
+            const cleanedInput = input
+              .replace('RESUME TO ANALYZE:', '')
+              .replace(/\[PII_[A-Z_]+\]/g, '"masked"') // Заменяем PII маркеры на валидный JSON
+              .trim();
+            inputData = JSON.parse(cleanedInput || '{}');
+            experience = inputData.experience || [];
+          } catch (e) {
+            // Если не удалось распарсить, используем пустые данные
+            console.log('Mock: Could not parse input, using empty data');
+          }
+          
+          // Проверка дубликатов и пустых записей
+          const companyMap = new Map();
+          const emptyEntries = [];
+          
+          experience.forEach(exp => {
+            const company = exp.company?.trim();
+            const role = exp.role?.trim();
+            
+            // Пустые записи (без компании и должности)
+            if (!company && !role) {
+              emptyEntries.push(exp.id);
+              return;
+            }
+            
+            // Группировка по компании для поиска дубликатов
+            const key = company?.toLowerCase() || '__no_company__';
+            if (!companyMap.has(key)) {
+              companyMap.set(key, []);
+            }
+            companyMap.set(key, [...companyMap.get(key), exp.id]);
+          });
+          
+          // Добавляем пустые записи как группу для удаления
+          if (emptyEntries.length > 1) {
+            duplicateGroups.push({ 
+              company: locale === 'ru' ? 'пустые записи' : 'empty entries', 
+              ids: emptyEntries,
+              isEmpty: true
+            });
+          }
+          
+          // Добавляем дубликаты по компании
+          companyMap.forEach((ids, company) => {
+            if (ids.length > 1 && company !== '__no_company__') {
+              duplicateGroups.push({ company, ids });
+            }
+          });
+
+          const improvements = [
+            {
+              id: 'summary',
+              type: 'summary',
+              priority: 'high',
+              title: locale === 'ru' ? 'Улучшить Summary' : 'Improve Summary',
+              description: locale === 'ru' 
+                ? 'Summary слишком общее. Добавьте конкретные достижения и цифры.' 
+                : 'Summary is too generic. Add specific achievements and numbers.',
+              canAutoFix: true
+            },
+            {
+              id: 'exp1',
+              type: 'experience',
+              priority: 'medium',
+              title: locale === 'ru' ? 'Добавить метрики в опыт' : 'Add metrics to experience',
+              description: locale === 'ru'
+                ? 'Второй опыт работы не содержит количественных результатов.'
+                : 'Second work experience lacks quantitative results.',
+              canAutoFix: true,
+              targetId: 2
+            },
+            {
+              id: 'title_mismatch',
+              type: 'experience',
+              priority: 'medium',
+              title: locale === 'ru' ? 'Несоответствие текущей позиции и опыта' : 'Position-Experience Mismatch',
+              description: locale === 'ru'
+                ? 'Указана позиция Senior Full Stack Developer, но опыт работы показывает Middle Frontend Developer. Требуется уточнение профессиональной позиции.'
+                : 'Position says Senior Full Stack Developer but experience shows Middle Frontend Developer. Consider clarifying your professional title.',
+              canAutoFix: false
+            },
+            {
+              id: 'projects',
+              type: 'projects',
+              priority: 'medium',
+              title: locale === 'ru' ? 'Отсутствие проектов' : 'No Projects',
+              description: locale === 'ru'
+                ? 'Секция проектов пуста. Рекомендуется добавить личные или коммерческие проекты для усиления резюме.'
+                : 'Projects section is empty. Consider adding personal or commercial projects to strengthen your resume.',
+              canAutoFix: false
+            },
+            {
+              id: 'skills',
+              type: 'skills',
+              priority: 'low',
+              title: locale === 'ru' ? 'Добавить soft skills' : 'Add soft skills',
+              description: locale === 'ru'
+                ? 'Рекомендуется добавить 2-3 soft skill для баланса.'
+                : 'Consider adding 2-3 soft skills for balance.',
+              canAutoFix: false
+            }
+          ];
+
+          // Добавляем информацию о дубликатах/пустых записях, если они найдены
+          if (duplicateGroups.length > 0) {
+            duplicateGroups.forEach((group, idx) => {
+              const isEmptyGroup = group.isEmpty;
+              improvements.unshift({
+                id: `duplicates_${idx}`,
+                type: 'duplicates',
+                priority: 'high',
+                title: isEmptyGroup 
+                  ? (locale === 'ru' ? 'Удаление пустых записей опыта' : 'Remove Empty Experience Entries')
+                  : (locale === 'ru' ? 'Удаление дубликатов опыта работы' : 'Remove Duplicate Experience'),
+                description: isEmptyGroup
+                  ? (locale === 'ru' 
+                      ? `Обнаружено ${group.ids.length} пустых записей опыта работы без компании и должности. Рекомендуется удалить их.`
+                      : `Found ${group.ids.length} empty experience entries without company and role. Consider removing them.`)
+                  : (locale === 'ru'
+                      ? `Обнаружены повторяющиеся записи опыта работы (${group.company}). Необходимо оставить уникальные записи.`
+                      : `Duplicate experience entries found (${group.company}). Keep unique entries.`),
+                canAutoFix: true,
+                duplicateIds: group.ids,
+                removeAll: isEmptyGroup // Для пустых записей удаляем все
+              });
+            });
+          }
+
           resolve({
             content: JSON.stringify({
-              overallScore: 72,
+              overallScore: duplicateGroups.length > 0 ? 65 : 72,
               scores: {
-                ats: { score: 78, label: locale === 'ru' ? 'ATS Совместимость' : 'ATS Compatibility' },
-                clarity: { score: 65, label: locale === 'ru' ? 'Ясность' : 'Clarity' },
-                impact: { score: 70, label: locale === 'ru' ? 'Импакт' : 'Impact' },
-                completeness: { score: 75, label: locale === 'ru' ? 'Полнота' : 'Completeness' }
+                ats: { score: duplicateGroups.length > 0 ? 60 : 78, label: locale === 'ru' ? 'ATS Совместимость' : 'ATS Compatibility' },
+                clarity: { score: duplicateGroups.length > 0 ? 70 : 65, label: locale === 'ru' ? 'Ясность' : 'Clarity' },
+                impact: { score: duplicateGroups.length > 0 ? 65 : 70, label: locale === 'ru' ? 'Импакт' : 'Impact' },
+                completeness: { score: duplicateGroups.length > 0 ? 55 : 75, label: locale === 'ru' ? 'Полнота' : 'Completeness' }
               },
               strengths: [
-                locale === 'ru' ? 'Хорошая структура резюме' : 'Good resume structure',
-                locale === 'ru' ? 'Указаны ключевые технологии' : 'Key technologies listed',
-                locale === 'ru' ? 'Есть опыт работы с метриками' : 'Experience with metrics included'
+                locale === 'ru' ? 'Количественные результаты в описании достижений' : 'Quantitative results in achievements',
+                locale === 'ru' ? 'Разнообразный стек технологий' : 'Diverse technology stack',
+                locale === 'ru' ? 'Опыт менторства и работы в командах' : 'Mentoring and team experience'
               ],
-              improvements: [
-                {
-                  id: 'summary',
-                  type: 'summary',
-                  priority: 'high',
-                  title: locale === 'ru' ? 'Улучшить Summary' : 'Improve Summary',
-                  description: locale === 'ru' 
-                    ? 'Summary слишком общее. Добавьте конкретные достижения и цифры.' 
-                    : 'Summary is too generic. Add specific achievements and numbers.',
-                  canAutoFix: true
-                },
-                {
-                  id: 'exp1',
-                  type: 'experience',
-                  priority: 'medium',
-                  title: locale === 'ru' ? 'Добавить метрики в опыт' : 'Add metrics to experience',
-                  description: locale === 'ru'
-                    ? 'Второй опыт работы не содержит количественных результатов.'
-                    : 'Second work experience lacks quantitative results.',
-                  canAutoFix: true,
-                  targetId: 2
-                },
-                {
-                  id: 'skills',
-                  type: 'skills',
-                  priority: 'low',
-                  title: locale === 'ru' ? 'Добавить soft skills' : 'Add soft skills',
-                  description: locale === 'ru'
-                    ? 'Рекомендуется добавить 2-3 soft skill для баланса.'
-                    : 'Consider adding 2-3 soft skills for balance.',
-                  canAutoFix: false
-                }
-              ],
+              improvements,
               atsKeywords: ['JavaScript', 'React', 'Node.js', 'TypeScript', 'PostgreSQL'],
-              missingKeywords: ['CI/CD', 'Agile', 'REST API', 'Git']
+              missingKeywords: ['CI/CD', 'Agile', 'REST API', 'Git', 'Team Lead', 'Scrum']
             }),
             provider: 'mock',
             model: 'mock'

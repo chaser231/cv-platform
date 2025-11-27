@@ -272,6 +272,30 @@ export default function ResumeBuilderApp() {
                         await handleAIAction('experience', improvement.targetId);
                       }
                     }}
+                    onAddSkill={(skill) => {
+                      // Добавить навык в профиль
+                      if (!masterProfile.skills?.includes(skill)) {
+                        updateMasterProfile({
+                          ...masterProfile,
+                          skills: [...(masterProfile.skills || []), skill]
+                        });
+                        triggerSave();
+                      }
+                    }}
+                    onRemoveDuplicates={(duplicateIds, removeAll = false) => {
+                      // Удалить дубликаты или пустые записи опыта
+                      // removeAll=true: удаляем все записи (для пустых)
+                      // removeAll=false: оставляем первый, удаляем остальные
+                      const idsToRemove = removeAll ? duplicateIds : duplicateIds.slice(1);
+                      const filteredExperience = masterProfile.experience.filter(
+                        exp => !idsToRemove.includes(exp.id)
+                      );
+                      updateMasterProfile({
+                        ...masterProfile,
+                        experience: filteredExperience
+                      });
+                      triggerSave();
+                    }}
                   />
                 </div>
                 
