@@ -79,6 +79,16 @@ const ROUTING_CONFIG = {
     maxRetries: 2
   },
   
+  // Анализ резюме (Health Check) - Claude Haiku с увеличенным лимитом токенов
+  'analyze_resume': {
+    primary: { provider: 'replicate', model: 'claude-haiku' },
+    russian: { provider: 'yandex', model: 'yandexgpt' },
+    fallback: { provider: 'replicate', model: 'gpt-4o-mini' },
+    timeout: 180000,
+    maxRetries: 2,
+    defaultMaxTokens: 2048 // Увеличен для длинных JSON ответов
+  },
+  
   // Cover Letter - Claude 3.7 (лучшее качество)
   'cover_letter': {
     primary: { provider: 'replicate', model: 'claude-3.7' },
@@ -205,7 +215,9 @@ class AIRouter {
    */
   async route(taskType, systemPrompt, userInput, options = {}) {
     const config = ROUTING_CONFIG[taskType] || ROUTING_CONFIG['default'];
-    const { temperature = 0.7, maxTokens, locale = 'en' } = options;
+    const { temperature = 0.7, locale = 'en' } = options;
+    // Используем maxTokens из options или из конфига задачи
+    const maxTokens = options.maxTokens || config.defaultMaxTokens || 1024;
 
     this.stats.totalRequests++;
 

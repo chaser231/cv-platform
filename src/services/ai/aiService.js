@@ -465,7 +465,6 @@ function parseJSON(content) {
       .trim();
     
     // Заменяем PII маркеры на валидные JSON значения
-    // [PII_PHONE] и подобные могут ломать JSON если попадают в числовые поля
     cleaned = cleaned
       .replace(/\[PII_PHONE\]/g, '"masked_phone"')
       .replace(/\[PII_EMAIL\]/g, '"masked_email"')
@@ -477,7 +476,37 @@ function parseJSON(content) {
   } catch (e) {
     console.error('Failed to parse AI JSON response:', e);
     console.error('Content was:', content?.substring(0, 500));
-    return null;
+    
+    // Попытка исправить обрезанный JSON
+    try {
+      let fixed = content
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .replace(/\[PII_[A-Z_]+\]/g, '"masked"')
+        .trim();
+      
+      // Если JSON обрезан — пытаемся закрыть его
+      const openBraces = (fixed.match(/{/g) || []).length;
+      const closeBraces = (fixed.match(/}/g) || []).length;
+      const openBrackets = (fixed.match(/\[/g) || []).length;
+      const closeBrackets = (fixed.match(/\]/g) || []).length;
+      
+      // Обрезаем до последнего полного элемента
+      if (openBraces > closeBraces || openBrackets > closeBrackets) {
+        // Убираем неполный элемент в конце
+        fixed = fixed.replace(/,?\s*"[^"]*"?\s*:?\s*[^,}\]]*$/, '');
+        // Закрываем скобки
+        for (let i = 0; i < openBrackets - closeBrackets; i++) fixed += ']';
+        for (let i = 0; i < openBraces - closeBraces; i++) fixed += '}';
+      }
+      
+      const result = JSON.parse(fixed);
+      console.log('Successfully recovered truncated JSON');
+      return result;
+    } catch (e2) {
+      console.error('Could not recover JSON:', e2);
+      return null;
+    }
   }
 }
 
@@ -771,7 +800,7 @@ ${JSON.stringify(profile, null, 2)}
       'analyze_resume',
       prompts.resume.analyzeResume(locale),
       input,
-      { locale }
+      { locale, maxTokens: 2048 } // Увеличен лимит для длинных JSON ответов
     );
     
     const parsed = parseJSON(result.content);
